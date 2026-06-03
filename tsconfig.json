@@ -13,6 +13,12 @@
     "moduleDetection": "force",
     "noEmit": true,
 
+    /* Alias @ → src */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
