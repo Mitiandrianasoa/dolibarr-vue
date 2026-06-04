@@ -1,0 +1,58 @@
+@import './module.css';
+
+/* ─── Table wrapper ──────────────────────────────────────────────────────────── */
+.table-container {
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+
+th {
+  padding: 10px 16px; text-align: left;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.7rem; font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.07em;
+  white-space: nowrap;
+}
+
+td {
+  padding: 12px 16px; text-align: left;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary); vertical-align: middle;
+}
+
+tbody tr { transition: background var(--transition); }
+tbody tr:hover { background: var(--bg-hover); }
+tbody tr:last-child td { border-bottom: none; }
+
+/* ─── Cells ──────────────────────────────────────────────────────────────────── */
+.ticket-title-cell { }
+.ticket-id {
+  display: block; font-family: 'ui-monospace', monospace;
+  font-size: 0.72rem; color: var(--text-muted); margin-bottom: 1px;
+}
+
+/* ─── Priority ───────────────────────────────────────────────────────────────── */
+.priority-cell { display: flex; align-items: center; gap: 7px; font-size: 0.82rem; color: var(--text-secondary); }
+.priority-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.prio-high     { background: #ef4444; }
+.prio-medium   { background: #f97316; }
+.prio-low      { background: #6b7280; }
+
+/* ─── Badges ─────────────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-block;
+  padding: 2px 8px; border-radius: 4px;
+  font-size: 0.7rem; font-weight: 600;
+  text-transform: uppercase; white-space: nowrap; letter-spacing: 0.04em;
+}
+.badge-blue   { background: #eff6ff; color: #1d4ed8; }
+.badge-orange { background: #fff7ed; color: #c2410c; }
+.badge-green  { background: #f0fdf4; color: #15803d; }
+.badge-gray   { background: #f9fafb; color: #374151; border: 1px solid #e5e7eb; }
