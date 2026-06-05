@@ -28,14 +28,18 @@ const AUTH_MODE  = import.meta.env.VITE_GLPI_AUTH_MODE  as 'token' | 'credential
 
 // ─── Gestion du session-token ─────────────────────────────────────────────────
 
-let sessionToken: string | null = null;
+const SESSION_TOKEN_KEY = 'glpi_session_token';
 
 export function getSessionToken(): string | null {
-  return sessionToken;
+  return sessionStorage.getItem(SESSION_TOKEN_KEY);
+}
+
+export function setSessionToken(token: string): void {
+  sessionStorage.setItem(SESSION_TOKEN_KEY, token);
 }
 
 export function clearSessionToken(): void {
-  sessionToken = null;
+  sessionStorage.removeItem(SESSION_TOKEN_KEY);
 }
 
 // ─── Instance Axios ───────────────────────────────────────────────────────────
@@ -53,6 +57,7 @@ export const glpiClient: AxiosInstance = axios.create({
 
 glpiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    const sessionToken = getSessionToken();
     if (sessionToken) {
       config.headers['Session-Token'] = sessionToken;
     }
@@ -71,7 +76,7 @@ glpiClient.interceptors.response.use(
 
     if (status === 401) {
       console.warn('[GLPI] Session expirée ou non autorisée — réinitialisation.');
-      sessionToken = null;
+      clearSessionToken();
     }
 
     console.error(`[GLPI API Error ${status}]`, message);
@@ -111,7 +116,8 @@ export async function initSession(): Promise<string> {
     throw new Error('[GLPI] initSession : session_token manquant dans la réponse.');
   }
 
-  sessionToken = data.session_token as string;
+  const sessionToken = data.session_token as string;
+  setSessionToken(sessionToken);
   console.info('[GLPI] Session initialisée :', sessionToken);
   return sessionToken;
 }
@@ -119,12 +125,13 @@ export async function initSession(): Promise<string> {
 // ─── killSession ──────────────────────────────────────────────────────────────
 
 export async function killSession(): Promise<void> {
+  const sessionToken = getSessionToken();
   if (!sessionToken) return;
   try {
     await glpiClient.get('/killSession');
     console.info('[GLPI] Session fermée.');
   } finally {
-    sessionToken = null;
+    clearSessionToken();
   }
 }
 
