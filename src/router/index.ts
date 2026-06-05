@@ -54,6 +54,12 @@ const router = createRouter({
           component: () => import('@/views/LocationsView.vue'),
           meta: { title: 'Localisations' },
         },
+        {
+          path: 'reset',
+          name: 'reset',
+          component: () => import('@/views/ResetView.vue'),
+          meta: { title: 'Réinitialiser' },
+        },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/dashboard' },

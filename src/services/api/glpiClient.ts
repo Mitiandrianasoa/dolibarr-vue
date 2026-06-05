@@ -40,7 +40,7 @@ export function clearSessionToken(): void {
 
 // ─── Instance Axios ───────────────────────────────────────────────────────────
 
-const glpiClient: AxiosInstance = axios.create({
+export const glpiClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
   timeout: 15_000,
   headers: {

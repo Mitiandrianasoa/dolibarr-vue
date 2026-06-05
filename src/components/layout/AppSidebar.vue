@@ -61,6 +61,23 @@
           </Transition>
         </RouterLink>
       </div>
+
+      <div class="nav-section">
+        <Transition name="label">
+          <p v-if="!collapsed" class="nav-section-label">Administration</p>
+        </Transition>
+        <RouterLink
+          to="/reset"
+          class="nav-item"
+          :class="{ active: isActive('/reset') }"
+          :title="collapsed ? 'Réinitialiser' : ''"
+        >
+          <span class="nav-icon" v-html="icons.reset" />
+          <Transition name="label">
+            <span v-if="!collapsed" class="nav-label">Réinitialiser</span>
+          </Transition>
+        </RouterLink>
+      </div>
     </nav>
 
     <!-- ─── Footer ────────────────────────────────────────────────────────────── -->
@@ -96,6 +113,7 @@ const icons = {
   users:     `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
   entities:  `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
   locations: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
+  reset:     `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 2v6h6M21.5 22v-6h-6"/><path d="M22 11.5A10 10 0 0 0 3.5 12.5"/><path d="M2 12.5a10 10 0 0 0 18.5-1"/></svg>`,
 }
 
 const mainNav = [
