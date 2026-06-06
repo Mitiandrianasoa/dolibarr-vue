@@ -52,6 +52,16 @@ export async function fetchTicketById(id: number): Promise<Ticket> {
   return mapGlpiTicketToTicket(data);
 }
 
+// ─── Fetch les éléments liés à un ticket ──────────────────────────────────────
+
+export async function fetchTicketItems(ticketId: number): Promise<any[]> {
+  const { default: glpiClient } = await import('./glpiClient');
+  // GLPI API : GET /Ticket/{id}/Item_Ticket
+  const { data } = await glpiClient.get(`${GLPI_ENDPOINTS.TICKET}/${ticketId}/Item_Ticket`);
+  return data;
+}
+
+
 // ─── Fetch tickets par statut (raccourcis utiles) ─────────────────────────────
 
 export async function fetchOpenTickets(entityId?: number): Promise<Ticket[]> {
@@ -97,4 +107,18 @@ export async function createTicket(payload: CreateTicketPayload): Promise<{ id: 
     },
   });
   return data;
+}
+
+// ─── Associer un élément à un ticket ─────────────────────────────────────────
+
+export async function associateItemToTicket(ticketId: number, itemType: string, itemId: number): Promise<void> {
+  const { default: glpiClient } = await import('./glpiClient');
+  // GLPI utilise l'endpoint /Item_Ticket pour lier du matériel à un ticket
+  await glpiClient.post('/Item_Ticket', {
+    input: {
+      tickets_id: ticketId,
+      itemtype: itemType,
+      items_id: itemId,
+    },
+  });
 }
