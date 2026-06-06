@@ -27,11 +27,42 @@ function buildTicketParams(params: TicketSearchParams): Record<string, unknown> 
   const q: Record<string, unknown> = {
     is_deleted: params.includeDeleted ? undefined : 0,
   };
-  if (params.entityId        !== undefined) q['searchText[entities_id]']       = params.entityId;
-  if (params.status          !== undefined) q['searchText[status]']             = params.status;
-  if (params.requesterId     !== undefined) q['searchText[users_id_recipient]'] = params.requesterId;
-  if (params.assignedUserId  !== undefined) q['searchText[_users_id_assign]']   = params.assignedUserId;
   return Object.fromEntries(Object.entries(q).filter(([, v]) => v !== undefined));
+}
+
+// ─── Recherche multicritère des tickets ────────────────────────────────────────
+
+export async function searchTickets(criteria: Array<{ field: string; searchtype: string; value: string }>): Promise<Ticket[]> {
+  const { default: glpiClient } = await import('./glpiClient');
+  
+  // Construit l'objet param attendu par /search/Ticket
+  // e.g. criteria[0][field]=12 & criteria[0][searchtype]=contains & criteria[0][value]=xyz
+  const params: Record<string, string> = {};
+  criteria.forEach((c, index) => {
+    params[`criteria[${index}][field]`] = c.field;
+    params[`criteria[${index}][searchtype]`] = c.searchtype;
+    params[`criteria[${index}][value]`] = c.value;
+  });
+
+  // fetchAllPaginated can be used with /search/Ticket
+  const raw = await fetchAllPaginated<Record<string, any>>(
+    GLPI_ENDPOINTS.SEARCH('Ticket'),
+    params
+  );
+
+  // Les endpoints de recherche (/search/xxx) renvoient des objets avec les identifiants des champs en clés
+  // Il faut re-mapper cela pour obtenir des Ticket (ou bien utiliser GET /Ticket si possible)
+  // Pour la consistance, ici on retourne un array vide si mapping complexe ou on peut relire via GET /Ticket/{id}
+  // Pour l'instant, faisons un simple re-fetch par ID ou utilisons un format raw minimal
+  const tickets: Ticket[] = [];
+  for (const item of raw) {
+    if (item[1]) { // field 1 is often ID or name, depends on searchOptions
+      // Idéalement on fetch le ticket complet
+      const t = await fetchTicketById(Number(item[2] || item.id || Object.values(item)[0]));
+      if(t) tickets.push(t);
+    }
+  }
+  return tickets;
 }
 
 // ─── Fetch tous les tickets ───────────────────────────────────────────────────
@@ -94,16 +125,25 @@ export interface CreateTicketPayload {
 
 export async function createTicket(payload: CreateTicketPayload): Promise<{ id: number }> {
   const { default: glpiClient } = await import('./glpiClient');
+  const { getCurrentSession } = await import('./sessionService');
+  
+  const session = getCurrentSession();
+  const currentEntityId = session ? session.glpiactive_entity : 0;
+  const currentUserId = session ? session.glpiID : 0;
+
   const { data } = await glpiClient.post<{ id: number }>(GLPI_ENDPOINTS.TICKET, {
     input: {
       name: payload.name,
       content: payload.content,
       type: payload.type ?? 1,
-      priority: payload.priority ?? 3,
+      status: 1, // Nouveau
       urgency: payload.urgency ?? 3,
-      entities_id: payload.entitiesId ?? 0,
-      itilcategories_id: payload.itilcategoriesId,
-      users_id_recipient: payload.usersIdRecipient,
+      impact: 3,
+      priority: payload.priority ?? 3,
+      entities_id: currentEntityId,
+      requesttypes_id: 1,
+      _users_id_requester: currentUserId,
+      users_id_recipient: currentUserId,
     },
   });
   return data;

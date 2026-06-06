@@ -58,15 +58,35 @@ const submitTicket = async () => {
 
     const ticketId = ticketRes.id;
 
+    const GLPI_ITEMTYPES: Record<string, string> = {
+      computer: 'Computer',
+      monitor: 'Monitor',
+      printer: 'Printer',
+      phone: 'Phone',
+      software: 'Software',
+      network: 'NetworkEquipment',
+    };
+
     // Associer les éléments
     const associationPromises = Array.from(selectedAssets.value).map(key => {
       const [type, idStr] = key.split('-');
       const id = parseInt(idStr, 10);
-      const itemtype = type.charAt(0).toUpperCase() + type.slice(1);
+      const itemtype = GLPI_ITEMTYPES[type] || 'Computer';
       return associateItemToTicket(ticketId, itemtype, id);
     });
 
     await Promise.all(associationPromises);
+
+    // Vérification: relire le ticket et ses éléments pour valider le contexte métier (droits)
+    try {
+      const { fetchTicketById, fetchTicketItems } = await import('@/services/api/ticketService');
+      const verifiedTicket = await fetchTicketById(ticketId);
+      console.log('[GLPI] Ticket vérifié après création :', verifiedTicket);
+      const verifiedItems = await fetchTicketItems(ticketId);
+      console.log('[GLPI] Items liés vérifiés :', verifiedItems);
+    } catch (verifyErr) {
+      console.warn("[GLPI] Le ticket a été créé mais pourrait ne pas être visible avec vos droits actuels.", verifyErr);
+    }
     
     // Rediriger vers la liste des tickets
     router.push('/tickets');

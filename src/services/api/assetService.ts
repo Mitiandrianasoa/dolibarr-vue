@@ -34,11 +34,6 @@ function buildBaseParams(params: AssetSearchParams): Record<string, unknown> {
   const q: Record<string, unknown> = {
     is_deleted: params.includeDeleted ? undefined : 0,
   };
-  if (params.entityId   !== undefined) q['searchText[entities_id]']  = params.entityId;
-  if (params.locationId !== undefined) q['searchText[locations_id]'] = params.locationId;
-  if (params.userId     !== undefined) q['searchText[users_id]']     = params.userId;
-  if (params.status     !== undefined) q['searchText[states_id]']    = params.status;
-  // Supprimer les clés undefined
   return Object.fromEntries(Object.entries(q).filter(([, v]) => v !== undefined));
 }
 

@@ -74,6 +74,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { initSession } from '@/services/api/glpiClient'
+import { fetchFullSession } from '@/services/api/sessionService'
 
 const router = useRouter()
 const loading = ref(false)
@@ -87,7 +88,8 @@ async function handleLogin() {
   loading.value = true
   error.value = ''
   try {
-    await initSession()
+    await initSession(form.value.username, form.value.password)
+    await fetchFullSession()
     router.push('/dashboard')
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Identifiants incorrects ou service indisponible'

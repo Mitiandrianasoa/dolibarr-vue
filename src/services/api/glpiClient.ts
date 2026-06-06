@@ -92,12 +92,15 @@ glpiClient.interceptors.response.use(
  *   - "token"       : utilise VITE_GLPI_USER_TOKEN
  *   - "credentials" : utilise login + password en Basic Auth
  */
-export async function initSession(): Promise<string> {
+export async function initSession(username?: string, password?: string): Promise<string> {
   const headers: Record<string, string> = {
     'App-Token': APP_TOKEN,
   };
 
-  if (AUTH_MODE === 'token' && USER_TOKEN) {
+  if (username && password) {
+    const credentials = btoa(`${username}:${password}`);
+    headers['Authorization'] = `Basic ${credentials}`;
+  } else if (AUTH_MODE === 'token' && USER_TOKEN) {
     headers['Authorization'] = `user_token ${USER_TOKEN}`;
   } else {
     // Basic auth : base64(login:password)
