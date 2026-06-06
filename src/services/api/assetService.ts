@@ -12,12 +12,7 @@ import { GLPI_ENDPOINTS } from '@/constants/glpi';
 import {
   type Asset,
   type AssetType,
-  type GlpiComputer,
-  type GlpiMonitor,
-  type GlpiPrinter,
-  mapGlpiComputerToAsset,
-  mapGlpiMonitorToAsset,
-  mapGlpiPrinterToAsset,
+  mapRawToAsset,
 } from '@/models/Asset';
 
 // ─── Paramètres de recherche communs ─────────────────────────────────────────
@@ -45,49 +40,49 @@ function buildBaseParams(params: AssetSearchParams): Record<string, unknown> {
 // ─── Computers ────────────────────────────────────────────────────────────────
 
 export async function fetchAllComputers(params: AssetSearchParams = {}): Promise<Asset[]> {
-  const raw = await fetchAllPaginated<GlpiComputer>(
+  const raw = await fetchAllPaginated<any>(
     GLPI_ENDPOINTS.COMPUTER,
     buildBaseParams(params),
   );
-  return raw.map(mapGlpiComputerToAsset);
+  return raw.map(item => mapRawToAsset(item, 'Computer'));
 }
 
 export async function fetchComputerById(id: number): Promise<Asset> {
   const { default: glpiClient } = await import('./glpiClient');
-  const { data } = await glpiClient.get<GlpiComputer>(`${GLPI_ENDPOINTS.COMPUTER}/${id}`);
-  return mapGlpiComputerToAsset(data);
+  const { data } = await glpiClient.get<any>(`${GLPI_ENDPOINTS.COMPUTER}/${id}`);
+  return mapRawToAsset(data, 'Computer');
 }
 
 // ─── Monitors ─────────────────────────────────────────────────────────────────
 
 export async function fetchAllMonitors(params: AssetSearchParams = {}): Promise<Asset[]> {
-  const raw = await fetchAllPaginated<GlpiMonitor>(
+  const raw = await fetchAllPaginated<any>(
     GLPI_ENDPOINTS.MONITOR,
     buildBaseParams(params),
   );
-  return raw.map(mapGlpiMonitorToAsset);
+  return raw.map(item => mapRawToAsset(item, 'Monitor'));
 }
 
 export async function fetchMonitorById(id: number): Promise<Asset> {
   const { default: glpiClient } = await import('./glpiClient');
-  const { data } = await glpiClient.get<GlpiMonitor>(`${GLPI_ENDPOINTS.MONITOR}/${id}`);
-  return mapGlpiMonitorToAsset(data);
+  const { data } = await glpiClient.get<any>(`${GLPI_ENDPOINTS.MONITOR}/${id}`);
+  return mapRawToAsset(data, 'Monitor');
 }
 
 // ─── Printers ─────────────────────────────────────────────────────────────────
 
 export async function fetchAllPrinters(params: AssetSearchParams = {}): Promise<Asset[]> {
-  const raw = await fetchAllPaginated<GlpiPrinter>(
+  const raw = await fetchAllPaginated<any>(
     GLPI_ENDPOINTS.PRINTER,
     buildBaseParams(params),
   );
-  return raw.map(mapGlpiPrinterToAsset);
+  return raw.map(item => mapRawToAsset(item, 'Printer'));
 }
 
 export async function fetchPrinterById(id: number): Promise<Asset> {
   const { default: glpiClient } = await import('./glpiClient');
-  const { data } = await glpiClient.get<GlpiPrinter>(`${GLPI_ENDPOINTS.PRINTER}/${id}`);
-  return mapGlpiPrinterToAsset(data);
+  const { data } = await glpiClient.get<any>(`${GLPI_ENDPOINTS.PRINTER}/${id}`);
+  return mapRawToAsset(data, 'Printer');
 }
 
 // ─── Fetch tous les actifs (toutes catégories) ────────────────────────────────

@@ -32,7 +32,7 @@ onMounted(async () => {
 });
 
 const toggleAssetSelection = (asset: Asset) => {
-  const key = `${asset.type}-${asset.id}`;
+  const key = `${asset.itemtype}-${asset.id}`;
   if (selectedAssets.value.has(key)) {
     selectedAssets.value.delete(key);
   } else {
@@ -58,20 +58,10 @@ const submitTicket = async () => {
 
     const ticketId = ticketRes.id;
 
-    const GLPI_ITEMTYPES: Record<string, string> = {
-      computer: 'Computer',
-      monitor: 'Monitor',
-      printer: 'Printer',
-      phone: 'Phone',
-      software: 'Software',
-      network: 'NetworkEquipment',
-    };
-
     // Associer les éléments
     const associationPromises = Array.from(selectedAssets.value).map(key => {
-      const [type, idStr] = key.split('-');
+      const [itemtype, idStr] = key.split('-');
       const id = parseInt(idStr, 10);
-      const itemtype = GLPI_ITEMTYPES[type] || 'Computer';
       return associateItemToTicket(ticketId, itemtype, id);
     });
 
@@ -156,15 +146,15 @@ const submitTicket = async () => {
         <div v-if="loading" class="state-msg">Chargement des équipements...</div>
         <div v-else class="assets-list">
           <div 
-            v-for="asset in assets" :key="asset.type + asset.id"
+            v-for="asset in assets" :key="asset.itemtype + asset.id"
             class="asset-item"
-            :class="{ selected: selectedAssets.has(`${asset.type}-${asset.id}`) }"
+            :class="{ selected: selectedAssets.has(`${asset.itemtype}-${asset.id}`) }"
             @click="toggleAssetSelection(asset)"
           >
-            <input type="checkbox" :checked="selectedAssets.has(`${asset.type}-${asset.id}`)" readonly />
+            <input type="checkbox" :checked="selectedAssets.has(`${asset.itemtype}-${asset.id}`)" readonly />
             <div class="asset-info">
               <span class="asset-name">{{ asset.name }}</span>
-              <span class="asset-meta">{{ asset.type }} #{{ asset.id }}</span>
+              <span class="asset-meta">{{ asset.itemtype }} #{{ asset.id }}</span>
             </div>
           </div>
         </div>
