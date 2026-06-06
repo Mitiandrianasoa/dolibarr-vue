@@ -33,13 +33,13 @@ const router = createRouter({
         {
           path: 'tickets',
           name: 'tickets',
-          component: () => import('@/views/TicketsView.vue'),
+          component: () => import('@/views/front/TicketsView.vue'),
           meta: { title: 'Tickets' },
         },
         {
           path: 'tickets/create',
           name: 'ticket-create',
-          component: () => import('@/views/TicketCreateView.vue'),
+          component: () => import('@/views/front/TicketCreateView.vue'),
           meta: { title: 'Créer un Ticket' },
         },
         {
