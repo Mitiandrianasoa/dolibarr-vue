@@ -56,7 +56,7 @@ async function selectTicket(ticket: Ticket) {
 }
 
 function goToCreateTicket() {
-  router.push('/tickets/create')
+  router.push('/front/tickets/create')
 }
 
 function formatDate(dateString?: string): string {

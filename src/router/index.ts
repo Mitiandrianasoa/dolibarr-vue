@@ -25,22 +25,10 @@ const router = createRouter({
           meta: { title: 'Tableau de bord' },
         },
         {
-          path: 'assets',
-          name: 'assets',
-          component: () => import('@/views/AssetsView.vue'),
-          meta: { title: 'Actifs' },
-        },
-        {
           path: 'tickets',
           name: 'tickets',
           component: () => import('@/views/front/TicketsView.vue'),
           meta: { title: 'Tickets' },
-        },
-        {
-          path: 'tickets/create',
-          name: 'ticket-create',
-          component: () => import('@/views/front/TicketCreateView.vue'),
-          meta: { title: 'Créer un Ticket' },
         },
         {
           path: 'users',
@@ -67,6 +55,30 @@ const router = createRouter({
           meta: { title: 'Réinitialiser' },
         },
       ],
+    },
+    {
+      path: '/front',
+      component: () => import('@/components/layout/AppFrontLayout.vue'),
+      children: [
+        {
+          path: 'tickets',
+          name: 'tickets',
+          component: () => import('@/views/front/TicketsView.vue'),
+          meta: { title: 'Tickets' },
+        },
+        {
+          path: 'tickets/create',
+          name: 'ticket-create',
+          component: () => import('@/views/front/TicketCreateView.vue'),
+          meta: { title: 'Créer un Ticket' },
+        },
+         {
+          path: 'assets',
+          name: 'assets',
+          component: () => import('@/views/AssetsView.vue'),
+          meta: { title: 'Actifs' },
+        },
+      ]
     },
     { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
   ],

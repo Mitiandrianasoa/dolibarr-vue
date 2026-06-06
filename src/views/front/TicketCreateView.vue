@@ -174,7 +174,7 @@ const submitTicket = async () => {
 </template>
 
 <style scoped>
-@import '../styles/module.css';
+@import '../../styles/module.css';
 
 .split-layout {
   display: flex;
