@@ -54,6 +54,13 @@ const router = createRouter({
           component: () => import('@/views/ResetView.vue'),
           meta: { title: 'Réinitialiser' },
         },
+        // router/index.ts — ajouter la route
+        {
+          path: 'import',
+          name: 'import',
+          component: () => import('@/views/back/ImportView.vue'),
+          meta: { title: 'Import de données' },
+        },
       ],
     },
     {

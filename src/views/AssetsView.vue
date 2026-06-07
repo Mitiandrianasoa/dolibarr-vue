@@ -49,7 +49,8 @@ const statusOptions = [
   { value: '2', label: 'En stock' },
   { value: '3', label: 'Reforme' },
   { value: '4', label: 'En attente' },
-  { value: '5', label: 'Hors service' },
+  { value: '5', label: 'En panne' },
+  { value: '6', label: 'Hors service' },
 ]
 
 const totalLabel = computed(() => {
@@ -168,7 +169,8 @@ function getStatusLabel(status: number): string {
     2: 'En stock',
     3: 'Reforme',
     4: 'En attente',
-    5: 'Hors service',
+    5: 'En panne',
+    6: 'Hors service',
   }
   return map[status] ?? 'Inconnu'
 }

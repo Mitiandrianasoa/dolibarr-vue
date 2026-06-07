@@ -19,7 +19,9 @@ const itemtypesToDelete = [
   'ITILCategory',
   'Location',
   // Budget
-  'Budget'
+  'Budget',
+  //Documents
+  'Document',
 ];
 
 const resetDatabase = async () => {

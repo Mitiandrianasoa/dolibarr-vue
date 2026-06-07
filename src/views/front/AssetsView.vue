@@ -45,11 +45,12 @@ const assetTypes: Array<{ value: AssetType | ''; label: string }> = [
 
 const statusOptions = [
   { value: '', label: 'Tous les statuts' },
-  { value: '1', label: 'En service' },
+  { value: '1', label: 'En production' },    // ← Modifié
   { value: '2', label: 'En stock' },
-  { value: '3', label: 'Reforme' },
-  { value: '4', label: 'En attente' },
-  { value: '5', label: 'Hors service' },
+  { value: '3', label: 'Réformé' },           // ← Modifié
+  { value: '4', label: 'En maintenance' },    // ← Modifié
+  { value: '5', label: 'En panne' },
+  { value: '6', label: 'Hors service' },
 ]
 
 const totalLabel = computed(() => {
@@ -164,11 +165,12 @@ function getTypeLabel(type: AssetType): string {
 
 function getStatusLabel(status: number): string {
   const map: Record<number, string> = {
-    1: 'En service',
+    1: 'En production',     // ← Modifié
     2: 'En stock',
-    3: 'Reforme',
-    4: 'En attente',
-    5: 'Hors service',
+    3: 'Réformé',           // ← Modifié
+    4: 'En maintenance',    // ← Modifié
+    5: 'En panne',
+    6: 'Hors service',
   }
   return map[status] ?? 'Inconnu'
 }

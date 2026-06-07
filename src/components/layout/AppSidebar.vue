@@ -120,6 +120,8 @@ const mainNav = [
   { to: '/dashboard', label: 'Dashboard',  icon: icons.dashboard },
   { to: '/assets',    label: 'Parc matériel',    icon: icons.assets,  count: null },
   { to: '/tickets',   label: 'Tickets',        icon: icons.tickets, count: null },
+  // AppSidebar.vue — ajouter dans orgNav ou adminNav
+  { to: '/import', label: 'Import CSV', icon: icons.import },
 ]
 
 const orgNav = [
