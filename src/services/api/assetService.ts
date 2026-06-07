@@ -213,6 +213,7 @@ async function searchAssetsByType(type: AssetType, params: AssetSearchParams): P
   const { default: glpiClient } = await import('./glpiClient');
   const itemType = GLPI_ITEMTYPES[type];
   const fields = GLPI_SEARCH_FIELDS[itemType];
+  
   const query: Record<string, unknown> = {
     range: '0-99',
     'forcedisplay[0]': fields.id,
@@ -220,11 +221,10 @@ async function searchAssetsByType(type: AssetType, params: AssetSearchParams): P
     'forcedisplay[2]': fields.entity,
     'forcedisplay[3]': fields.location,
     'forcedisplay[4]': fields.user,
-    'forcedisplay[5]': fields.group,
-    'forcedisplay[6]': fields.status,
-    'forcedisplay[7]': fields.serial,
-    'forcedisplay[8]': fields.inventory,
-    'forcedisplay[9]': fields.dateMod,
+    'forcedisplay[5]': fields.status,
+    'forcedisplay[6]': fields.serial,
+    'forcedisplay[7]': fields.inventory,
+    'forcedisplay[8]': fields.dateMod,
   };
 
   let index = 0;
@@ -232,27 +232,48 @@ async function searchAssetsByType(type: AssetType, params: AssetSearchParams): P
   if (params.entityId !== undefined) index = appendCriteria(query, index, fields.entity, 'equals', params.entityId);
   if (params.locationId !== undefined) index = appendCriteria(query, index, fields.location, 'equals', params.locationId);
   if (params.userId !== undefined) index = appendCriteria(query, index, fields.user, 'equals', params.userId);
-  if (params.groupId !== undefined) index = appendCriteria(query, index, fields.group, 'equals', params.groupId);
   if (params.status !== undefined) index = appendCriteria(query, index, fields.status, 'equals', params.status);
   if (params.serial) index = appendCriteria(query, index, fields.serial, 'contains', params.serial);
   if (params.inventoryNumber) index = appendCriteria(query, index, fields.inventory, 'contains', params.inventoryNumber);
 
   const { data } = await glpiClient.get<GlpiSearchResponse>(`/search/${itemType}`, { params: query });
 
-  return (data.data ?? []).map((row) => ({
-    id: Number(getSearchValue(row, fields.id)),
-    type,
-    name: getSearchValue(row, fields.name) || `${itemType} sans nom`,
-    entityId: Number(getSearchValue(row, fields.entity)) || 0,
-    locationId: Number(getSearchValue(row, fields.location)) || undefined,
-    userId: Number(getSearchValue(row, fields.user)) || undefined,
-    groupId: Number(getSearchValue(row, fields.group)) || undefined,
-    status: Number(getSearchValue(row, fields.status)) || 0,
-    serial: getSearchValue(row, fields.serial) || undefined,
-    inventoryNumber: getSearchValue(row, fields.inventory) || undefined,
-    updatedAt: getSearchValue(row, fields.dateMod) || undefined,
-    isDeleted: false,
-  }));
+  return (data.data ?? []).map((row) => {
+    // Récupérer la valeur du statut depuis la réponse GLPI
+    const statusValue = Number(getSearchValue(row, fields.status));
+    
+    console.log(`[DEBUG] Asset ${getSearchValue(row, fields.name)} - status raw: ${statusValue}`);
+    
+    return {
+      id: Number(getSearchValue(row, fields.id)),
+      name: getSearchValue(row, fields.name) || `${itemType} sans nom`,
+      itemtype: itemType,
+      entities_id: Number(getSearchValue(row, fields.entity)) || 0,
+      locations_id: Number(getSearchValue(row, fields.location)) || undefined,
+      users_id: Number(getSearchValue(row, fields.user)) || undefined,
+      states_id: statusValue || 1,
+      serial: getSearchValue(row, fields.serial) || undefined,
+      otherserial: getSearchValue(row, fields.inventory) || undefined,
+      date_mod: getSearchValue(row, fields.dateMod) || undefined,
+      is_deleted: false,
+      // Alias pour le composant
+      status: statusValue || 1,
+      locationId: Number(getSearchValue(row, fields.location)) || undefined,
+      userId: Number(getSearchValue(row, fields.user)) || undefined,
+      entityId: Number(getSearchValue(row, fields.entity)) || 0,
+      inventoryNumber: getSearchValue(row, fields.inventory) || undefined,
+      updatedAt: getSearchValue(row, fields.dateMod) || undefined,
+      type: type,
+    } as any;
+  });
+}
+
+// Dans assetService.ts, fonction temporaire
+export async function debugSearchOptions(itemType: string) {
+  const { default: glpiClient } = await import('./glpiClient');
+  const { data } = await glpiClient.get(`/listSearchOptions/${itemType}`);
+  console.log(`Search options for ${itemType}:`, data);
+  return data;
 }
 
 export async function searchAssets(params: AssetSearchParams = {}): Promise<Asset[]> {

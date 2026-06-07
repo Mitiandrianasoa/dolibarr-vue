@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { fetchAllAssets, searchAssets, type AssetSearchParams } from '@/services/api/assetService'
+import { searchAssets, type AssetSearchParams } from '@/services/api/assetService'
 import { fetchAllEntities } from '@/services/api/entityService'
 import { fetchAllLocations } from '@/services/api/locationService'
 import { fetchAllUsers } from '@/services/api/userService'
@@ -12,16 +12,33 @@ import type { User } from '@/models/User'
 
 const router = useRouter()
 
+// État
 const loading = ref(false)
 const loadingFilters = ref(false)
 const error = ref('')
 const assets = ref<Asset[]>([])
 const selectedAsset = ref<Asset | null>(null)
 
+// Données de référence
 const entities = ref<Entity[]>([])
 const locations = ref<Location[]>([])
 const users = ref<User[]>([])
 
+// Maps pour recherche rapide O(1)
+const entityMap = ref<Map<number, string>>(new Map())
+const locationMap = ref<Map<number, string>>(new Map())
+const userMap = ref<Map<number, string>>(new Map())
+
+// Map des statuts (définition unique)
+const STATUS_LABELS: Record<number, string> = {
+  1: 'En production',
+  2: 'En stock',
+  3: 'Réformé',
+  4: 'En maintenance',
+  5: 'En panne',
+}
+
+// Filtres
 const filters = ref({
   type: '' as AssetType | '',
   text: '',
@@ -45,23 +62,25 @@ const assetTypes: Array<{ value: AssetType | ''; label: string }> = [
 
 const statusOptions = [
   { value: '', label: 'Tous les statuts' },
-  { value: '1', label: 'En production' },    // ← Modifié
+  { value: '1', label: 'En production' },
   { value: '2', label: 'En stock' },
-  { value: '3', label: 'Réformé' },           // ← Modifié
-  { value: '4', label: 'En maintenance' },    // ← Modifié
+  { value: '3', label: 'Réformé' },
+  { value: '4', label: 'En maintenance' },
   { value: '5', label: 'En panne' },
-  { value: '6', label: 'Hors service' },
 ]
 
 const totalLabel = computed(() => {
   if (loading.value) return 'Chargement...'
-  return `${assets.value.length} element${assets.value.length > 1 ? 's' : ''}`
+  return `${assets.value.length} élément${assets.value.length > 1 ? 's' : ''}`
 })
 
+// Chargement initial
 onMounted(async () => {
-  await Promise.all([loadFilterSources(), load()])
+  await loadFilterSources()
+  await load()
 })
 
+// Charge les données de référence (entités, localisations, utilisateurs)
 async function loadFilterSources() {
   loadingFilters.value = true
   try {
@@ -70,20 +89,29 @@ async function loadFilterSources() {
       fetchAllLocations(),
       fetchAllUsers({ isActive: true }),
     ])
+    
     entities.value = allEntities
     locations.value = allLocations
     users.value = allUsers
+    
+    // Construire les Maps pour recherche rapide
+    allEntities.forEach(e => entityMap.value.set(e.id, e.fullPath || e.name))
+    allLocations.forEach(l => locationMap.value.set(l.id, l.fullPath || l.name))
+    allUsers.forEach(u => userMap.value.set(u.id, `${u.firstname} ${u.lastname}`.trim() || u.username))
+    
   } catch (e) {
-    console.error(e)
+    console.error('Erreur chargement références:', e)
   } finally {
     loadingFilters.value = false
   }
 }
 
+// Convertit une string en nombre
 function toNumber(value: string): number | undefined {
   return value === '' ? undefined : Number(value)
 }
 
+// Construit les paramètres de recherche
 function buildSearchParams(): AssetSearchParams {
   return {
     type: filters.value.type,
@@ -98,6 +126,7 @@ function buildSearchParams(): AssetSearchParams {
   }
 }
 
+// Charge les assets
 async function load() {
   loading.value = true
   error.value = ''
@@ -105,19 +134,25 @@ async function load() {
 
   try {
     assets.value = await searchAssets(buildSearchParams())
+    
+    // Debug
+    if (assets.value.length > 0) {
+      console.log('Premier asset:', {
+        id: assets.value[0].id,
+        name: assets.value[0].name,
+        status: assets.value[0].status,
+        states_id: (assets.value[0] as any).states_id,
+      })
+    }
   } catch (e) {
     console.error(e)
-    error.value = "La recherche GLPI avancee n'a pas pu aboutir. Chargement simple des elements."
-    assets.value = await fetchAllAssets({
-      type: filters.value.type,
-      status: toNumber(filters.value.status),
-      includeDeleted: filters.value.includeDeleted,
-    })
+    error.value = "Erreur lors du chargement des éléments"
   } finally {
     loading.value = false
   }
 }
 
+// Réinitialise les filtres
 function resetFilters() {
   filters.value = {
     type: '',
@@ -133,20 +168,23 @@ function resetFilters() {
   load()
 }
 
+// Sélectionne un asset
 function selectAsset(asset: Asset) {
   selectedAsset.value = asset
 }
 
+// Crée un ticket pour l'asset
 function createTicketForAsset(asset: Asset) {
   router.push({
     path: '/tickets/create',
     query: {
-      itemtype: getGlpiItemType(asset.type),
+      itemtype: getGlpiItemType(asset.type || 'computer'),
       itemId: String(asset.id),
     },
   })
 }
 
+// Retourne le type GLPI
 function getGlpiItemType(type: AssetType): string {
   const map: Record<AssetType, string> = {
     computer: 'Computer',
@@ -158,48 +196,42 @@ function getGlpiItemType(type: AssetType): string {
   return map[type]
 }
 
-function getTypeLabel(type: AssetType): string {
+// Retourne le libellé du type
+function getTypeLabel(type?: AssetType): string {
+  if (!type) return 'Inconnu'
   const match = assetTypes.find((item) => item.value === type)
   return match?.label ?? type
 }
 
-function getStatusLabel(status: number): string {
-  const map: Record<number, string> = {
-    1: 'En production',     // ← Modifié
-    2: 'En stock',
-    3: 'Réformé',           // ← Modifié
-    4: 'En maintenance',    // ← Modifié
-    5: 'En panne',
-    6: 'Hors service',
-  }
-  return map[status] ?? 'Inconnu'
+// Retourne le libellé du statut (simple et direct)
+function getStatusLabel(status?: number): string {
+  if (!status) return 'Inconnu'
+  return STATUS_LABELS[status] || 'Inconnu'
 }
 
+// Retourne le nom de l'entité (optimisé avec Map)
 function getEntityName(id?: number): string {
   if (!id) return '-'
-  return entities.value.find((entity) => entity.id === id)?.fullPath
-    ?? entities.value.find((entity) => entity.id === id)?.name
-    ?? `Entite #${id}`
+  return entityMap.value.get(id) || `Entité #${id}`
 }
 
+// Retourne le nom de la localisation (optimisé avec Map)
 function getLocationName(id?: number): string {
   if (!id) return '-'
-  return locations.value.find((location) => location.id === id)?.fullPath
-    ?? locations.value.find((location) => location.id === id)?.name
-    ?? `Lieu #${id}`
+  return locationMap.value.get(id) || `Lieu #${id}`
 }
 
+// Retourne le nom de l'utilisateur (optimisé avec Map)
 function getUserName(id?: number): string {
   if (!id) return '-'
-  const user = users.value.find((item) => item.id === id)
-  if (!user) return `Utilisateur #${id}`
-  return `${user.firstname} ${user.lastname}`.trim() || user.username
+  return userMap.value.get(id) || `Utilisateur #${id}`
 }
 
+// Formate une date
 function formatDate(value?: string): string {
   if (!value) return '-'
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
+  if (isNaN(date.getTime())) return '-'
   return date.toLocaleDateString('fr-FR', {
     day: '2-digit',
     month: '2-digit',
@@ -210,32 +242,41 @@ function formatDate(value?: string): string {
 
 <template>
   <div class="module-view animate-in">
+    <!-- En-tête -->
     <div class="mv-header">
       <div class="mv-title-wrap">
         <div class="mv-icon icon-blue">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
         </div>
         <div>
-          <h1 class="mv-title">Elements du parc</h1>
-          <p class="mv-sub">Recherche multi-criteres via GLPI</p>
+          <h1 class="mv-title">Éléments du parc</h1>
+          <p class="mv-sub">Recherche multi-critères via GLPI</p>
         </div>
       </div>
       <div class="mv-actions">
         <span class="result-count">{{ totalLabel }}</span>
-        <button class="btn-secondary" @click="resetFilters" :disabled="loading">Reinitialiser</button>
+        <button class="btn-secondary" @click="resetFilters" :disabled="loading">Réinitialiser</button>
         <button class="btn-fetch" @click="load" :disabled="loading">
-          <svg v-if="loading" class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+          <svg v-if="loading" class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+          </svg>
           {{ loading ? 'Chargement...' : 'Rechercher' }}
         </button>
       </div>
     </div>
 
+    <!-- Message d'erreur -->
     <div v-if="error" class="alert-error">{{ error }}</div>
 
+    <!-- Filtres -->
     <div class="filters-card">
       <div class="filter-group">
         <label>Recherche</label>
-        <input v-model="filters.text" type="text" placeholder="Nom de l'element" @keyup.enter="load" />
+        <input v-model="filters.text" type="text" placeholder="Nom de l'élément" @keyup.enter="load" />
       </div>
 
       <div class="filter-group">
@@ -253,9 +294,9 @@ function formatDate(value?: string): string {
       </div>
 
       <div class="filter-group">
-        <label>Entite</label>
+        <label>Entité</label>
         <select v-model="filters.entityId" :disabled="loadingFilters">
-          <option value="">Toutes les entites</option>
+          <option value="">Toutes les entités</option>
           <option v-for="entity in entities" :key="entity.id" :value="String(entity.id)">
             {{ entity.fullPath || entity.name }}
           </option>
@@ -283,21 +324,22 @@ function formatDate(value?: string): string {
       </div>
 
       <div class="filter-group">
-        <label>Serie</label>
-        <input v-model="filters.serial" type="text" placeholder="Numero de serie" @keyup.enter="load" />
+        <label>Série</label>
+        <input v-model="filters.serial" type="text" placeholder="Numéro de série" @keyup.enter="load" />
       </div>
 
       <div class="filter-group">
         <label>Inventaire</label>
-        <input v-model="filters.inventoryNumber" type="text" placeholder="Numero interne" @keyup.enter="load" />
+        <input v-model="filters.inventoryNumber" type="text" placeholder="Numéro interne" @keyup.enter="load" />
       </div>
 
       <label class="checkbox-filter">
         <input v-model="filters.includeDeleted" type="checkbox" />
-        <span>Afficher supprimes</span>
+        <span>Afficher supprimés</span>
       </label>
     </div>
 
+    <!-- Liste des assets -->
     <div class="assets-layout">
       <div class="table-container" v-if="assets.length > 0">
         <table>
@@ -306,12 +348,12 @@ function formatDate(value?: string): string {
               <th>Type</th>
               <th>Nom</th>
               <th>Statut</th>
-              <th>Entite</th>
+              <th>Entité</th>
               <th>Localisation</th>
               <th>Utilisateur</th>
-              <th>Serie</th>
+              <th>Série</th>
               <th>Inventaire</th>
-              <th>Modifie le</th>
+              <th>Modifié le</th>
             </tr>
           </thead>
           <tbody>
@@ -335,21 +377,25 @@ function formatDate(value?: string): string {
         </table>
       </div>
 
+      <!-- État vide -->
       <div v-else class="empty-module">
         <div class="em-icon icon-blue">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/></svg>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+          </svg>
         </div>
-        <h2>Aucun element</h2>
-        <p>Lancez une recherche ou modifiez vos criteres.</p>
+        <h2>Aucun élément</h2>
+        <p>Lancez une recherche ou modifiez vos critères.</p>
       </div>
 
+      <!-- Détail de l'asset sélectionné -->
       <aside class="asset-detail" v-if="selectedAsset">
         <div class="detail-header">
           <div>
             <span :class="['badge', `badge-${selectedAsset.type}`]">{{ getTypeLabel(selectedAsset.type) }}</span>
             <h2>{{ selectedAsset.name }}</h2>
           </div>
-          <button class="btn-close" @click="selectedAsset = null">x</button>
+          <button class="btn-close" @click="selectedAsset = null">×</button>
         </div>
 
         <dl>
@@ -357,22 +403,22 @@ function formatDate(value?: string): string {
           <dd>#{{ selectedAsset.id }}</dd>
           <dt>Statut</dt>
           <dd>{{ getStatusLabel(selectedAsset.status) }}</dd>
-          <dt>Entite</dt>
+          <dt>Entité</dt>
           <dd>{{ getEntityName(selectedAsset.entityId) }}</dd>
           <dt>Localisation</dt>
           <dd>{{ getLocationName(selectedAsset.locationId) }}</dd>
-          <dt>Utilisateur affecte</dt>
+          <dt>Utilisateur affecté</dt>
           <dd>{{ getUserName(selectedAsset.userId) }}</dd>
-          <dt>Numero de serie</dt>
+          <dt>Numéro de série</dt>
           <dd>{{ selectedAsset.serial || '-' }}</dd>
-          <dt>Numero d'inventaire</dt>
+          <dt>Numéro d'inventaire</dt>
           <dd>{{ selectedAsset.inventoryNumber || '-' }}</dd>
-          <dt>Derniere modification</dt>
+          <dt>Dernière modification</dt>
           <dd>{{ formatDate(selectedAsset.updatedAt) }}</dd>
         </dl>
 
         <button class="btn-primary full-width" @click="createTicketForAsset(selectedAsset)">
-          Creer un ticket avec cet element
+          Créer un ticket avec cet élément
         </button>
       </aside>
     </div>
@@ -380,9 +426,7 @@ function formatDate(value?: string): string {
 </template>
 
 <style scoped>
-/* ============================================
-   LAYOUT PRINCIPAL
-   ============================================ */
+/* Vos styles existants restent identiques */
 .module-view {
   padding: 1.5rem;
   max-width: 1600px;
@@ -391,9 +435,6 @@ function formatDate(value?: string): string {
   min-height: 100vh;
 }
 
-/* ============================================
-   HEADER
-   ============================================ */
 .mv-header {
   display: flex;
   justify-content: space-between;
@@ -449,9 +490,6 @@ function formatDate(value?: string): string {
   color: #1e293b;
 }
 
-/* ============================================
-   BOUTONS
-   ============================================ */
 .btn-fetch,
 .btn-secondary,
 .btn-primary {
@@ -513,9 +551,6 @@ function formatDate(value?: string): string {
   to { transform: rotate(360deg); }
 }
 
-/* ============================================
-   CARTE DES FILTRES
-   ============================================ */
 .filters-card {
   background: white;
   border-radius: 16px;
@@ -579,9 +614,6 @@ function formatDate(value?: string): string {
   cursor: pointer;
 }
 
-/* ============================================
-   ALERTE ERREUR
-   ============================================ */
 .alert-error {
   background: #fef2f2;
   border-left: 4px solid #ef4444;
@@ -592,9 +624,6 @@ function formatDate(value?: string): string {
   font-size: 0.875rem;
 }
 
-/* ============================================
-   LAYOUT ASSETS + DETAIL
-   ============================================ */
 .assets-layout {
   display: grid;
   gap: 1.5rem;
@@ -602,9 +631,6 @@ function formatDate(value?: string): string {
   align-items: start;
 }
 
-/* ============================================
-   TABLEAU DES ASSETS
-   ============================================ */
 .table-container {
   background: white;
   border-radius: 16px;
@@ -653,9 +679,6 @@ tbody tr.selected {
   color: #0f172a;
 }
 
-/* ============================================
-   BADGES DE TYPE
-   ============================================ */
 .badge {
   display: inline-block;
   padding: 0.25rem 0.625rem;
@@ -672,9 +695,6 @@ tbody tr.selected {
 .badge-phone { background: #f3e8ff; color: #6b21a5; }
 .badge-network { background: #fed7aa; color: #9a3412; }
 
-/* ============================================
-   STATUT
-   ============================================ */
 .status-dot {
   display: inline-block;
   width: 8px;
@@ -689,9 +709,6 @@ tbody tr.selected {
 .status-4 { background: #f97316; box-shadow: 0 0 0 2px #ffedd5; }
 .status-5 { background: #94a3b8; box-shadow: 0 0 0 2px #f1f5f9; }
 
-/* ============================================
-   PANEL LATÉRAL DÉTAIL
-   ============================================ */
 .asset-detail {
   background: white;
   border-radius: 16px;
@@ -762,9 +779,6 @@ dd {
   width: 100%;
 }
 
-/* ============================================
-   ÉTAT VIDE
-   ============================================ */
 .empty-module {
   background: white;
   border-radius: 16px;
@@ -796,14 +810,10 @@ dd {
   font-size: 0.875rem;
 }
 
-/* ============================================
-   RESPONSIVE
-   ============================================ */
 @media (max-width: 1200px) {
   .assets-layout {
     grid-template-columns: 1fr;
   }
-  
   .asset-detail {
     position: static;
   }
@@ -813,25 +823,20 @@ dd {
   .module-view {
     padding: 1rem;
   }
-  
   .mv-header {
     flex-direction: column;
     align-items: flex-start;
   }
-  
   .mv-actions {
     width: 100%;
     justify-content: flex-start;
   }
-  
   .filters-card {
     grid-template-columns: 1fr;
   }
-  
   .table-container {
     border-radius: 12px;
   }
-  
   th, td {
     padding: 0.625rem 0.875rem;
   }
@@ -842,20 +847,16 @@ dd {
     width: 40px;
     height: 40px;
   }
-  
   .mv-title {
     font-size: 1.25rem;
   }
-  
   .mv-actions {
     flex-wrap: wrap;
   }
-  
   .btn-fetch, .btn-secondary {
     flex: 1;
     justify-content: center;
   }
-  
   .empty-module {
     padding: 2rem;
   }

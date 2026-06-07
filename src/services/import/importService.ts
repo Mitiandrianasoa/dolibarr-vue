@@ -390,6 +390,63 @@ async function findAssetByInventory(
   return null
 }
 
+/**
+ * Recherche ou crée un modèle (ComputerModel, MonitorModel, etc.)
+ * Retourne son ID
+ */
+async function resolveModel(
+  name: string,
+  itemtype: string,
+  cache: Map<string, number>,
+  logDebug?: (msg: string, details?: any) => void
+): Promise<number | undefined> {
+  if (!name) return undefined
+  
+  const cacheKey = `${itemtype}_${name}`
+  if (cache.has(cacheKey)) return cache.get(cacheKey)!
+
+  // Déterminer l'endpoint selon le type d'asset
+  let endpoint = ''
+  if (itemtype === 'Computer') endpoint = 'ComputerModel'
+  else if (itemtype === 'Monitor') endpoint = 'MonitorModel'
+  else if (itemtype === 'Printer') endpoint = 'PrinterModel'
+  else if (itemtype === 'Phone') endpoint = 'PhoneModel'
+  else if (itemtype === 'NetworkEquipment') endpoint = 'NetworkEquipmentModel'
+  else return undefined
+
+  logDebug?.(`[Model] Recherche de "${name}" dans ${endpoint}...`)
+
+  try {
+    // Rechercher le modèle existant
+    const { data } = await glpiClient.get(`/${endpoint}`, {
+      params: { 'searchText[name]': name, range: '0-1' },
+    })
+    
+    if (Array.isArray(data) && data.length > 0) {
+      logDebug?.(`[Model] Trouvé: "${name}" (ID=${data[0].id})`)
+      cache.set(cacheKey, data[0].id)
+      return data[0].id
+    }
+    
+    // Créer le modèle s'il n'existe pas
+    logDebug?.(`[Model] Création de "${name}" dans ${endpoint}...`)
+    const { data: created } = await glpiClient.post(`/${endpoint}`, {
+      input: { 
+        name: name,
+        entities_id: 0,
+        is_recursive: 0
+      },
+    })
+    logDebug?.(`[Model] Créé: ID=${created.id}`)
+    cache.set(cacheKey, created.id)
+    return created.id
+    
+  } catch (e: any) {
+    logDebug?.(`[Model] Erreur pour "${name}": ${e.message}`)
+    return undefined
+  }
+}
+
 async function findAssetByName(
   name: string,
   nameToIdCache: Map<string, { itemtype: string; id: number }>,
@@ -450,6 +507,7 @@ async function importAssets(
 
   const locationCache = new Map<string, number>()
   const manufacturerCache = new Map<string, number>()
+  const modelCache = new Map<string, number>()  // ← NOUVEAU : cache pour les modèles
   const userCache = new Map<string, number>()
 
   for (const row of rows) {
@@ -472,13 +530,14 @@ async function importAssets(
     }
 
     try {
-      const [locationId, manufacturerId, userId] = await Promise.all([
+      const [locationId, manufacturerId, modelId, userId] = await Promise.all([
         resolveLocation(row.Location, locationCache, logDebug),
         resolveManufacturer(row.Manufacturer, manufacturerCache, logDebug),
+        resolveModel(row.Model, itemtype, modelCache, logDebug),  // ← NOUVEAU
         resolveOrCreateUser(row.User, userCache, addLog, userStats),
       ])
 
-      logDebug(`[Asset] Résolutions: location=${locationId}, manufacturer=${manufacturerId}, user=${userId}`)
+      logDebug(`[Asset] Résolutions: location=${locationId}, manufacturer=${manufacturerId}, model=${modelId}, user=${userId}`)
 
       const payload: Record<string, unknown> = {
         name:        row.Name,
@@ -487,9 +546,22 @@ async function importAssets(
       }
       if (locationId)     payload.locations_id    = locationId
       if (manufacturerId) payload.manufacturers_id = manufacturerId
+      if (modelId) {
+        if (itemtype === 'Computer') {
+            payload.computermodels_id = modelId
+        } else if (itemtype === 'Monitor') {
+            payload.monitormodels_id = modelId
+        } else if (itemtype === 'Printer') {
+            payload.printermodels_id = modelId
+        } else if (itemtype === 'Phone') {
+            payload.phonemodels_id = modelId
+        } else if (itemtype === 'NetworkEquipment') {
+            payload.networkequipmentmodels_id = modelId
+        }
+        } 
       if (userId) {
-        payload.users_id_tech = userId  // Technicien assigné
-        payload.users_id      = userId  // Utilisateur responsable
+        payload.users_id_tech = userId
+        payload.users_id      = userId
       }
 
       logDebug(`[Asset] Payload: ${JSON.stringify(payload)}`)
@@ -497,7 +569,7 @@ async function importAssets(
       const { data } = await glpiClient.post<{ id: number }>(`/${itemtype}`, { input: payload })
       nameToIdCache.set(row.Name, { itemtype, id: data.id })
       
-      addLog('success', `[Asset] "${row.Name}" créé (${itemtype} ID=${data.id}) - User: ${row.User || 'aucun'}`)
+      addLog('success', `[Asset] "${row.Name}" créé (${itemtype} ID=${data.id}) - Modèle: ${row.Model || 'aucun'}, User: ${row.User || 'aucun'}`)
       stats.created++
     } catch (e: any) {
       addLog('error', `[Asset] Erreur pour "${row.Name}" : ${e.message}`, e.response?.data)
@@ -507,7 +579,6 @@ async function importAssets(
 
   return stats
 }
-
 // ─── Import Feuille 2 : Tickets ───────────────────────────────────────────────
 
 interface TicketRow {
