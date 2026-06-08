@@ -162,3 +162,96 @@ export async function associateItemToTicket(ticketId: number, itemType: string, 
     },
   });
 }
+
+
+// src/services/api/ticketService.ts
+
+// Ajouter à la fin du fichier
+
+// ─── Mettre à jour un ticket ──────────────────────────────────────────────────
+
+export interface UpdateTicketPayload {
+  name?: string;
+  content?: string;
+  type?: 1 | 2;
+  status?: number;      // 1=Nouveau, 2=En cours, 3=Planifié, 4=En attente, 5=Résolu, 6=Fermé
+  priority?: number;    // 1–6
+  urgency?: number;     // 1–6
+  impact?: number;      // 1–6
+  itilcategories_id?: number;
+  assignedUserId?: number;
+  assignedGroupId?: number;
+}
+
+/**
+ * Met à jour un ticket existant
+ * @param id - ID du ticket
+ * @param payload - Champs à modifier
+ */
+export async function updateTicket(id: number, payload: UpdateTicketPayload): Promise<{ id: number }> {
+  const { default: glpiClient } = await import('./glpiClient');
+  
+  const { data } = await glpiClient.put<{ id: number }>(`${GLPI_ENDPOINTS.TICKET}/${id}`, {
+    input: payload
+  });
+  
+  console.log(`[GLPI] Ticket #${id} mis à jour:`, payload);
+  return data;
+}
+
+/**
+ * Change le statut d'un ticket
+ * @param id - ID du ticket
+ * @param status - Nouveau statut (1=Nouveau, 2=En cours, 3=Planifié, 4=En attente, 5=Résolu, 6=Fermé)
+ */
+export async function updateTicketStatus(id: number, status: number): Promise<{ id: number }> {
+  return updateTicket(id, { status });
+}
+
+/**
+ * Ajoute un suivi (followup) à un ticket
+ * @param ticketId - ID du ticket
+ * @param content - Contenu du suivi
+ * @param isPrivate - Si vrai, visible uniquement par les techniciens
+ */
+export async function addTicketFollowup(ticketId: number, content: string, isPrivate: boolean = false): Promise<{ id: number }> {
+  const { default: glpiClient } = await import('./glpiClient');
+  
+  const { data } = await glpiClient.post('/ITILFollowup', {
+    input: {
+      itemtype: 'Ticket',
+      items_id: ticketId,
+      content: content,
+      is_private: isPrivate ? 1 : 0,
+      requesttypes_id: 1
+    }
+  });
+  
+  console.log(`[GLPI] Suivi ajouté au ticket #${ticketId}`);
+  return data;
+}
+
+/**
+ * Ajoute une solution à un ticket (résolution)
+ * @param ticketId - ID du ticket
+ * @param content - Solution apportée
+ */
+export async function addTicketSolution(ticketId: number, content: string): Promise<{ id: number }> {
+  const { default: glpiClient } = await import('./glpiClient');
+  
+  const { data } = await glpiClient.post('/ITILSolution', {
+    input: {
+      itemtype: 'Ticket',
+      items_id: ticketId,
+      content: content,
+      solutiontypes_id: 1
+    }
+  });
+  
+  console.log(`[GLPI] Solution ajoutée au ticket #${ticketId}`);
+  
+  // Optionnel: marquer le ticket comme résolu automatiquement
+  await updateTicketStatus(ticketId, 5);
+  
+  return data;
+}

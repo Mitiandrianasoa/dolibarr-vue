@@ -21,15 +21,35 @@ const router = createRouter({
         {
           path: 'dashboard',
           name: 'dashboard',
-          component: () => import('@/views/DashboardView.vue'),
+          component: () => import('@/views/back/DashboardView.vue'),
           meta: { title: 'Tableau de bord' },
         },
         {
           path: 'tickets',
-          name: 'tickets',
-          component: () => import('@/views/front/TicketsView.vue'),
+          name: 'tickets back',
+          component: () => import('@/views/back/TicketsView.vue'),
           meta: { title: 'Tickets' },
         },
+        {
+          path: 'tickets/create',
+          name: 'ticket-create',
+          component: () => import('@/views/back/TicketCreateView.vue'),
+          meta: { title: 'Créer un Ticket' },
+        },
+        // Ajouter cette route
+        {
+          path: '/tickets/:id/edit',
+          name: 'TicketEdit',
+          component: () => import('@/views/back/TicketEditView.vue'),
+          meta: { title: 'Modifier le ticket' }
+        },
+         {
+          path: 'assets',
+          name: 'assets back',
+          component: () => import('@/views/back/AssetsView.vue'),
+          meta: { title: 'Actifs' },
+        },
+
         {
           path: 'users',
           name: 'users',

@@ -342,7 +342,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-@import '../styles/DashboardView.css';
+@import '@/styles/DashboardView.css';
 
 /* Styles supplémentaires */
 .dashboard-section {
