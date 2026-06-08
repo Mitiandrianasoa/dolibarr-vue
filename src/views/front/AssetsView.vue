@@ -5,7 +5,7 @@ import {
   SearchAssets, 
   GetAssetTypes, 
   GetStatusOptions,
-  GetAssetById,
+  // GetAssetById,
   type Asset, 
   type AssetSearchParams 
 } from '@/services/assets/assetsService'

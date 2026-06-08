@@ -7,7 +7,7 @@
  *   GET /apirest.php/Printer
  */
 
-import { fetchAllPaginated } from './glpiClient';
+import { fetchAllPaginated, glpiClient } from './glpiClient';
 import { GLPI_ENDPOINTS } from '@/constants/glpi';
 import {
   type Asset,
@@ -29,6 +29,44 @@ export interface AssetSearchParams {
   inventoryNumber?: string;
   includeDeleted?: boolean;
 }
+
+
+/**
+ * Récupère le statut d'un asset par son ID et son type
+ * @param itemtype - Type GLPI (Computer, Monitor, Printer, etc.)
+ * @param id - ID de l'asset
+ * @returns Le statut (nom) ou 'Inconnu' si non trouvé
+ */
+export async function getAssetStatusById(itemtype: string, id: number): Promise<string> {
+  try {
+    const { data } = await glpiClient.get(`/${itemtype}/${id}?expand_dropdowns=true`);
+    
+    // Récupérer le statut depuis states_id
+    let status = 'Inconnu';
+    const statusField = data.states_id;
+    
+    if (typeof statusField === 'object' && statusField !== null) {
+      status = statusField.name || statusField.completename || 'Inconnu';
+    } else if (typeof statusField === 'string') {
+      status = statusField;
+    } else if (typeof statusField === 'number') {
+      const statusMap: Record<number, string> = {
+        1: 'En service',
+        2: 'En stock',
+        3: 'Réformé',
+        4: 'En maintenance',
+        5: 'En panne'
+      };
+      status = statusMap[statusField] || 'Inconnu';
+    }
+    
+    return status;
+  } catch (error) {
+    console.error(`Erreur récupération statut pour ${itemtype}#${id}:`, error);
+    return 'Inconnu';
+  }
+}
+
 
 function buildBaseParams(params: AssetSearchParams): Record<string, unknown> {
   const q: Record<string, unknown> = {

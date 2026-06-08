@@ -11,194 +11,619 @@
           <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
         </svg>
         <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+          <polyline points="23 4 23 10 17 10"/>
+          <polyline points="1 20 1 14 7 14"/>
           <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
         </svg>
         {{ loading ? 'Chargement...' : 'Actualiser' }}
       </button>
     </div>
 
-    <!-- KPI Cards -->
-    <div class="kpi-grid">
-      <div
-        v-for="(card, i) in kpiCards"
-        :key="card.label"
-        class="kpi-card animate-in"
-        :style="{ animationDelay: `${i * 60}ms` }"
-        :class="card.colorClass"
-        @click="$router.push(card.route)"
-      >
-        <div class="kpi-top">
-          <div class="kpi-icon-wrap">
-            <span v-html="card.icon" />
-          </div>
-          <span class="kpi-trend" :class="card.trend > 0 ? 'up' : 'down'" v-if="!loading">
-            {{ card.trend > 0 ? '+' : '' }}{{ card.trend }}%
-          </span>
+    <!-- SECTION ASSETS -->
+    <div class="dashboard-section">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Parc Informatique</h2>
+          <p class="section-sub">Gestion des actifs matériels</p>
         </div>
-        <div class="kpi-value">
-          <span v-if="loading" class="skeleton-val" />
-          <span v-else>{{ card.value.toLocaleString('fr-FR') }}</span>
+        <div class="section-total">
+          <span class="total-badge">{{ stats?.assets.total || 0 }} éléments</span>
         </div>
-        <div class="kpi-label">{{ card.label }}</div>
-        <div class="kpi-sub">{{ card.sub }}</div>
-        <div class="kpi-bar">
-          <div class="kpi-bar-fill" :style="{ width: card.fillPct + '%' }" />
+      </div>
+
+      <!-- KPI Grid - Assets -->
+      <div class="kpi-grid">
+        <div class="kpi-card blue">
+          <div class="kpi-value">{{ stats?.assets.total || 0 }}</div>
+          <div class="kpi-label">Total actifs</div>
+          <div class="kpi-sub">Tous équipements confondus</div>
         </div>
+        <div 
+          v-for="(count, type) in sortedAssetTypes" 
+          :key="type" 
+          class="kpi-card"
+          :class="getAssetCardColor(type)"
+        >
+          <div class="kpi-value">{{ count }}</div>
+          <div class="kpi-label">{{ getAssetTypeLabel(type) }}</div>
+          <div class="kpi-sub">{{ getAssetTypeDesc(type) }}</div>
+        </div>
+      </div>
+
+      <!-- Tableau des assets récents -->
+      <div class="data-table-container">
+        <div class="table-header">
+          <h3>Derniers équipements ajoutés</h3>
+        </div>
+        <div v-if="loadingAssets" class="loading-state">
+          <div class="spinner"></div>
+        </div>
+        <table v-else-if="recentAssets.length > 0" class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Nom</th>
+              <th>Type</th>
+              <th>Statut</th>
+              <!-- <th>Localisation</th>
+              <th>Utilisateur</th> -->
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="asset in recentAssets" :key="asset.id">
+              <td class="col-id">#{{ asset.id }}</td>
+              <td class="col-name">{{ asset.name }}</td>
+              <td><span class="badge" :class="getAssetBadgeClass(asset.type)">{{ getAssetTypeLabel(asset.type) }}</span></td>
+              <td><span class="status-badge" :class="getStatusClass(asset.status)">{{ asset.status }}</span></td>
+              <!-- <td>{{ asset.locationName || '-' }}</td>
+              <td>{{ asset.userName || '-' }}</td> -->
+            </tr>
+          </tbody>
+        </table>
+        <div v-else class="empty-state">Aucun équipement trouvé</div>
       </div>
     </div>
 
-    <!-- Row 2: Modules detail + Recent tickets -->
-    <div class="dash-row">
-      <!-- Models overview -->
-      <section class="card models-card animate-in" style="animation-delay:240ms">
-        <div class="card-header">
-          <h3>Modules principaux</h3>
-          <span class="badge badge-blue">5 actifs</span>
+    <!-- SECTION TICKETS -->
+    <div class="dashboard-section">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Tickets</h2>
+          <p class="section-sub">Suivi des incidents et demandes</p>
         </div>
-        <div class="models-list">
-          <div
-            v-for="mod in modelModules"
-            :key="mod.name"
-            class="model-row"
-            @click="$router.push(mod.route)"
-          >
-            <div class="model-icon" :class="mod.colorClass">
-              <span v-html="mod.icon" />
-            </div>
-            <div class="model-info">
-              <div class="model-name">{{ mod.name }}</div>
-              <div class="model-desc">{{ mod.desc }}</div>
-            </div>
-            <div class="model-meta">
-              <div class="model-endpoint">{{ mod.endpoint }}</div>
-              <div class="model-count">
-                <span v-if="loading" class="skeleton-sm" />
-                <span v-else>{{ mod.count }} entrées</span>
-              </div>
-            </div>
-            <svg class="model-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-          </div>
+        <div class="section-total">
+          <span class="total-badge">{{ stats?.tickets.total || 0 }} tickets</span>
         </div>
-      </section>
+      </div>
 
-      <!-- Recent tickets -->
-      <section class="card tickets-card animate-in" style="animation-delay:300ms">
-        <div class="card-header">
-          <h3>Tickets récents</h3>
-          <RouterLink to="/tickets" class="card-link">Voir tout →</RouterLink>
+      <!-- KPI Grid - Tickets -->
+      <div class="kpi-grid">
+        <div class="kpi-card orange">
+          <div class="kpi-value">{{ stats?.tickets.total || 0 }}</div>
+          <div class="kpi-label">Total tickets</div>
+          <div class="kpi-sub">Tous tickets confondus</div>
         </div>
-        <div class="ticket-list">
-          <div v-if="loading" class="ticket-loading">
-            <div v-for="n in 4" :key="n" class="skeleton-row" />
-          </div>
-          <div v-else v-for="t in recentTickets" :key="t.id" class="ticket-row">
-            <div class="ticket-id">#{{ t.id }}</div>
-            <div class="ticket-info">
-              <div class="ticket-title">{{ t.title }}</div>
-              <div class="ticket-meta">{{ t.date }}</div>
-            </div>
-            <span class="badge" :class="statusClass(t.status)">{{ t.statusLabel }}</span>
-            <span class="badge" :class="priorityClass(t.priority)">{{ t.priorityLabel }}</span>
-          </div>
-          <div v-if="!loading && recentTickets.length === 0" class="empty-state">
-            <span>Aucun ticket — API non connectée</span>
-          </div>
+        <div class="kpi-card red">
+          <div class="kpi-value">{{ stats?.tickets.byType[1] || 0 }}</div>
+          <div class="kpi-label">Incidents</div>
+          <div class="kpi-sub">Tickets de type incident</div>
         </div>
-      </section>
+        <div class="kpi-card cyan">
+          <div class="kpi-value">{{ stats?.tickets.byType[2] || 0 }}</div>
+          <div class="kpi-label">Demandes</div>
+          <div class="kpi-sub">Tickets de type demande</div>
+        </div>
+        <div class="kpi-card green">
+          <div class="kpi-value">{{ stats?.tickets.openCount || 0 }}</div>
+          <div class="kpi-label">Tickets ouverts</div>
+          <div class="kpi-sub">En cours de traitement</div>
+        </div>
+      </div>
+
+      <!-- Tableau des tickets récents -->
+      <div class="data-table-container">
+        <div class="table-header">
+          <h3>Derniers tickets créés</h3>
+        </div>
+        <div v-if="loadingTickets" class="loading-state">
+          <div class="spinner"></div>
+        </div>
+        <table v-else-if="recentTickets.length > 0" class="data-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Titre</th>
+              <th>Type</th>
+              <th>Statut</th>
+              <th>Priorité</th>
+              <th>Créé le</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="ticket in recentTickets" :key="ticket.id">
+              <td class="col-id">#{{ ticket.id }}</td>
+              <td class="col-name">{{ ticket.title }}</td>
+              <td><span class="badge" :class="ticket.type === 1 ? 'badge-red' : 'badge-cyan'">{{ ticket.type === 1 ? 'Incident' : 'Demande' }}</span></td>
+              <td><span class="status-badge" :class="getTicketStatusClass(ticket.status)">{{ ticket.statusLabel }}</span></td>
+              <td><span class="priority-badge" :class="getPriorityClass(ticket.priority)">{{ ticket.priorityLabel }}</span></td>
+              <td class="col-date">{{ ticket.date }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-else class="empty-state">Aucun ticket trouvé</div>
+      </div>
     </div>
 
     <!-- API Info Banner -->
-    <div class="api-banner animate-in" style="animation-delay:360ms">
-      <div class="api-banner-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
-      </div>
+    <div class="api-banner animate-in" v-if="apiError">
       <div class="api-banner-content">
-        <div class="api-banner-title">Configuration GLPI requise</div>
-        <div class="api-banner-msg">
-          Générez un <code>App-Token</code> dans GLPI → Configuration → API, puis renseignez-le dans <code>.env</code> → <code>VITE_GLPI_APP_TOKEN</code>.
-          Vérifiez aussi le <code>DocumentRoot</code> dans <code>config/httpd-vhosts.conf</code>.
-        </div>
+        <div class="api-banner-title">⚠️ Erreur de connexion</div>
+        <div class="api-banner-msg">{{ apiError }}</div>
       </div>
-      <button class="btn-outline-sm">Docs →</button>
+      <button class="btn-outline-sm" @click="refreshAll">Réessayer</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { getDashboardStats, ASSET_TYPE_LABELS, type DashboardStats } from '@/services/api/dashboardService'
+import { fetchAllTickets } from '@/services/api/ticketService'
+import { fetchAllAssets, getAssetStatusById} from '@/services/api/assetService'
 
 const loading = ref(false)
+const loadingAssets = ref(false)
+const loadingTickets = ref(false)
+const apiError = ref('')
+const stats = ref<DashboardStats | null>(null)
 
-/* ─── Mock data (remplacer par vrais fetches GLPI) ───────────────────────────── */
-const kpiCards = ref([
-  {
-    label: 'Actifs totaux',   value: 0,  sub: 'Ordinateurs, écrans, imprimantes',
-    trend: 0, fillPct: 0, route: '/assets',
-    colorClass: 'blue',
-    icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`,
-  },
-  {
-    label: 'Tickets ouverts', value: 0,  sub: 'Incidents et demandes en cours',
-    trend: 0, fillPct: 0, route: '/tickets',
-    colorClass: 'orange',
-    icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 5H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2H9"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>`,
-  },
-  {
-    label: 'Utilisateurs',    value: 0,  sub: 'Techniciens et demandeurs actifs',
-    trend: 0, fillPct: 0, route: '/users',
-    colorClass: 'purple',
-    icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
-  },
-  {
-    label: 'Entités',         value: 0,  sub: 'Structures organisationnelles',
-    trend: 0, fillPct: 0, route: '/entities',
-    colorClass: 'cyan',
-    icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`,
-  },
-])
+// Données pour les tableaux
+const recentAssets = ref<any[]>([])
+const recentTickets = ref<any[]>([])
 
-const modelModules = [
-  { name: 'Assets (Actifs)',   desc: 'Computers · Monitors · Printers', endpoint: 'GET /Computer /Monitor /Printer', count: '—', route: '/assets',    colorClass: 'icon-blue',   icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>` },
-  { name: 'Tickets',           desc: 'Incidents · Demandes · SLA',      endpoint: 'GET /Ticket',                    count: '—', route: '/tickets',   colorClass: 'icon-orange', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>` },
-  { name: 'Utilisateurs',      desc: 'Comptes · Rôles · Groupes',       endpoint: 'GET /User',                      count: '—', route: '/users',     colorClass: 'icon-purple', icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>` },
-  { name: 'Entités',           desc: 'Organisations · Hiérarchie',       endpoint: 'GET /Entity',                    count: '—', route: '/entities',  colorClass: 'icon-cyan',   icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>` },
-  { name: 'Localisations',     desc: 'Bâtiments · Salles · Sites',       endpoint: 'GET /Location',                  count: '—', route: '/locations', colorClass: 'icon-green',  icon: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>` },
-]
+// Trier les types d'assets
+const sortedAssetTypes = computed(() => {
+  if (!stats.value) return {}
+  const entries = Object.entries(stats.value.assets.byType)
+  entries.sort((a, b) => getAssetTypeLabel(a[0]).localeCompare(getAssetTypeLabel(b[0])))
+  return Object.fromEntries(entries)
+})
 
-const recentTickets = ref<{id:number;title:string;date:string;status:number;statusLabel:string;priority:number;priorityLabel:string}[]>([])
-
-function statusClass(s: number) {
-  if (s <= 1) return 'badge-blue'
-  if (s <= 3) return 'badge-orange'
-  if (s === 5) return 'badge-green'
-  return 'badge-gray'
-}
-function priorityClass(p: number) {
-  if (p >= 5) return 'badge-red'
-  if (p >= 4) return 'badge-orange'
-  if (p >= 3) return 'badge-blue'
-  return 'badge-gray'
+// Helpers Assets
+function getAssetCardColor(type: string): string {
+  const colors: Record<string, string> = {
+    'Computer': 'blue',
+    'Monitor': 'green',
+    'Printer': 'orange',
+    'Phone': 'purple',
+    'NetworkEquipment': 'cyan'
+  }
+  return colors[type] || 'gray'
 }
 
+function getAssetTypeLabel(type: string): string {
+  return ASSET_TYPE_LABELS[type] || type
+}
+
+function getAssetTypeDesc(type: string): string {
+  const desc: Record<string, string> = {
+    'Computer': 'Postes de travail',
+    'Monitor': 'Écrans et afficheurs',
+    'Printer': 'Imprimantes et scanners',
+    'Phone': 'Téléphones IP',
+    'NetworkEquipment': 'Switchs, routeurs'
+  }
+  return desc[type] || 'Équipement'
+}
+
+function getAssetBadgeClass(type: string): string {
+  const classes: Record<string, string> = {
+    'Computer': 'badge-blue',
+    'Monitor': 'badge-green',
+    'Printer': 'badge-orange',
+    'Phone': 'badge-purple',
+    'NetworkEquipment': 'badge-cyan'
+  }
+  return classes[type] || 'badge-gray'
+}
+
+function getStatusClass(status: string): string {
+  const statusMap: Record<string, string> = {
+    'En production': 'status-production',
+    'En service': 'status-production',
+    'En stock': 'status-stock',
+    'Réformé': 'status-reformed',
+    'En maintenance': 'status-maintenance',
+    'En panne': 'status-panne'
+  }
+  return statusMap[status] || 'status-default'
+}
+
+// Helpers Tickets
+function getTicketStatusClass(status: number): string {
+  const classes: Record<number, string> = {
+    1: 'status-new',
+    2: 'status-progress',
+    3: 'status-planned',
+    4: 'status-pending',
+    5: 'status-solved',
+    6: 'status-closed'
+  }
+  return classes[status] || 'status-default'
+}
+
+function getPriorityClass(priority: number): string {
+  if (priority >= 5) return 'priority-critical'
+  if (priority >= 4) return 'priority-high'
+  if (priority >= 3) return 'priority-medium'
+  return 'priority-low'
+}
+
+function getPriorityLabel(priority: number): string {
+  const labels: Record<number, string> = {
+    1: 'Très basse', 2: 'Basse', 3: 'Moyenne', 4: 'Haute', 5: 'Très haute', 6: 'Majeure'
+  }
+  return labels[priority] || 'Moyenne'
+}
+
+function getStatusLabel(status: number): string {
+  const labels: Record<number, string> = {
+    1: 'Nouveau', 2: 'En cours', 3: 'Planifié', 4: 'En attente', 5: 'Résolu', 6: 'Fermé'
+  }
+  return labels[status] || 'Inconnu'
+}
+
+// Chargement des données
 async function refreshAll() {
   loading.value = true
-  // TODO: appeler initSession() puis les services fetch
-  // Exemple :
-  // await initSession()
-  // const assets  = await fetchAllAssets()
-  // const tickets = await fetchAllTickets()
-  // kpiCards.value[0].value = assets.length
-  // kpiCards.value[1].value = tickets.filter(t => t.status < 5).length
-  await new Promise(r => setTimeout(r, 1200)) // simulation
-  loading.value = false
+  apiError.value = ''
+  loadingAssets.value = true
+  loadingTickets.value = true
+  
+  try {
+    // Charger les statistiques
+    stats.value = await getDashboardStats()
+    
+    // Charger les assets récents
+    const allAssets = await fetchAllAssets()
+    // Enrichir chaque asset avec son statut
+    const assetsWithStatus = await Promise.all(
+      allAssets.map(async (asset) => {
+        const status = await getAssetStatusById(asset.itemtype, asset.id)
+        return {
+          ...asset,
+          status: status
+        }
+      })
+    )
+    
+    // Trier et prendre les 10 plus récents
+    recentAssets.value = assetsWithStatus
+      .sort((a, b) => (b.id || 0) - (a.id || 0))
+      .slice(0, 10)
+      .map(a => ({
+        id: a.id,
+        name: a.name,
+        type: a.itemtype,
+        status: a.status,  // ← Maintenant c'est une string
+        // locationName: a.locationName,
+        // userName: a.userName
+      }))
+    
+    // Charger les tickets récents
+    const allTickets = await fetchAllTickets()
+    recentTickets.value = allTickets
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 10)
+      .map(t => ({
+        id: t.id,
+        title: t.title,
+        type: t.type,
+        status: t.status,
+        statusLabel: getStatusLabel(t.status),
+        priority: t.priority,
+        priorityLabel: getPriorityLabel(t.priority),
+        date: new Date(t.createdAt).toLocaleDateString('fr-FR')
+      }))
+    
+  } catch (e: any) {
+    console.error('Erreur chargement dashboard:', e)
+    apiError.value = e.message || 'Erreur de connexion à GLPI'
+  } finally {
+    loading.value = false
+    loadingAssets.value = false
+    loadingTickets.value = false
+  }
 }
 
-onMounted(() => { /* refreshAll() */ })
+onMounted(() => {
+  refreshAll()
+})
 </script>
 
 <style scoped>
 @import '../styles/DashboardView.css';
+
+/* Styles supplémentaires */
+.dashboard-section {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.section-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.section-sub {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+.section-total {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.total-badge {
+  background: var(--bg-hover);
+  padding: 0.375rem 0.875rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* KPI Cards */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.kpi-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  transition: all 0.2s ease;
+}
+
+.kpi-card.blue { border-left: 4px solid #3b82f6; }
+.kpi-card.orange { border-left: 4px solid #f97316; }
+.kpi-card.red { border-left: 4px solid #ef4444; }
+.kpi-card.green { border-left: 4px solid #22c55e; }
+.kpi-card.cyan { border-left: 4px solid #06b6d4; }
+.kpi-card.purple { border-left: 4px solid #8b5cf6; }
+.kpi-card.gray { border-left: 4px solid #94a3b8; }
+
+.kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.kpi-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.kpi-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.kpi-sub {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+/* Data Table */
+.data-table-container {
+  margin-top: 1rem;
+}
+
+.table-header {
+  margin-bottom: 1rem;
+}
+
+.table-header h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 0.75rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table td {
+  padding: 0.75rem 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
+}
+
+.col-id {
+  font-family: monospace;
+  font-weight: 600;
+  color: var(--accent);
+  width: 60px;
+}
+
+.col-name {
+  font-weight: 500;
+}
+
+.col-date {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.badge-blue { background: #dbeafe; color: #1e40af; }
+.badge-green { background: #dcfce7; color: #166534; }
+.badge-orange { background: #ffedd5; color: #c2410c; }
+.badge-purple { background: #f3e8ff; color: #6b21a5; }
+.badge-cyan { background: #ecfeff; color: #0891b2; }
+.badge-red { background: #fee2e2; color: #991b1b; }
+.badge-gray { background: #f1f5f9; color: #475569; }
+
+.status-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.status-production { background: #dcfce7; color: #166534; }
+.status-stock { background: #fef9c3; color: #854d0e; }
+.status-reformed { background: #fee2e2; color: #991b1b; }
+.status-maintenance { background: #ffedd5; color: #c2410c; }
+.status-panne { background: #fef2f2; color: #b91c1c; }
+.status-default { background: #f1f5f9; color: #475569; }
+
+.status-new { background: #dbeafe; color: #1e40af; }
+.status-progress { background: #ffedd5; color: #c2410c; }
+.status-planned { background: #f3e8ff; color: #6b21a5; }
+.status-pending { background: #fef9c3; color: #854d0e; }
+.status-solved { background: #dcfce7; color: #166534; }
+.status-closed { background: #f1f5f9; color: #475569; }
+
+.priority-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.priority-critical { background: #fee2e2; color: #991b1b; }
+.priority-high { background: #ffedd5; color: #c2410c; }
+.priority-medium { background: #dbeafe; color: #1e40af; }
+.priority-low { background: #f1f5f9; color: #475569; }
+
+/* Loading state */
+.loading-state {
+  display: flex;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+/* API Banner */
+.api-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.5rem;
+}
+
+.api-banner-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #dc2626;
+  margin-bottom: 0.25rem;
+}
+
+.api-banner-msg {
+  font-size: 0.75rem;
+  color: #b91c1c;
+}
+
+.btn-outline-sm {
+  padding: 0.375rem 0.875rem;
+  border-radius: 6px;
+  border: 1px solid #fecaca;
+  background: white;
+  color: #dc2626;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.btn-outline-sm:hover {
+  background: #fef2f2;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .dashboard-section {
+    padding: 1rem;
+  }
+  
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .data-table {
+    display: block;
+    overflow-x: auto;
+  }
+}
 </style>
