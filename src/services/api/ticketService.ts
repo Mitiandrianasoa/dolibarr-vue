@@ -337,3 +337,222 @@ export async function addTicketSolution(ticketId: number, content: string): Prom
   
   return data;
 }
+
+// Ajoute à la fin du fichier ticketService.ts
+
+/**
+ * Récupère les suivis d'un ticket
+ */
+export async function fetchTicketFollowups(ticketId: number): Promise<any[]> {
+  const { default: glpiClient } = await import('./glpiClient');
+  
+  try {
+    const { data } = await glpiClient.get(`/Ticket/${ticketId}/ITILFollowup`);
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error(`Erreur lors du chargement des suivis du ticket #${ticketId}:`, error);
+    return [];
+  }
+}
+
+/**
+ * Récupère les solutions d'un ticket
+ */
+export async function fetchTicketSolutions(ticketId: number): Promise<any[]> {
+  const { default: glpiClient } = await import('./glpiClient');
+  
+  try {
+    const { data } = await glpiClient.get(`/Ticket/${ticketId}/ITILSolution`);
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error(`Erreur lors du chargement des solutions du ticket #${ticketId}:`, error);
+    return [];
+  }
+}
+
+/**
+ * Duplique une liste de tickets X fois chacun - Version COMPLÈTE
+ * Duplique : titre, description, type, priorité, matériels, coûts, suivis, solutions
+ * 
+ * @param tickets - Liste des tickets à dupliquer
+ * @param times - Nombre de fois à dupliquer chaque ticket
+ * @param withItems - Si true, duplique aussi les matériels liés
+ * @param withCosts - Si true, duplique aussi les coûts
+ * @param withFollowups - Si true, duplique aussi les suivis
+ * @param withSolutions - Si true, duplique aussi les solutions
+ * @returns Promise avec les résultats détaillés
+ */
+export async function duplicateTicketBatch(
+  tickets: Ticket[], 
+  times: number, 
+  withItems: boolean = true,
+  withCosts: boolean = true,
+  withFollowups: boolean = true,
+  withSolutions: boolean = true
+): Promise<{
+  totalRequests: number;
+  successCount: number;
+  errorCount: number;
+  results: Array<{
+    originalId: number;
+    originalTitle: string;
+    copies: Array<{ copyNumber: number; newId: number | null; error?: string }>;
+  }>;
+}> {
+  
+  const results = [];
+  let totalSuccess = 0;
+  let totalErrors = 0;
+  const totalRequests = tickets.length * times;
+
+  for (const originalTicket of tickets) {
+    const ticketCopies = [];
+    
+    for (let i = 0; i < times; i++) {
+      try {
+        // Importer tous les services nécessaires
+        const { 
+          createTicket, 
+          associateItemToTicket, 
+          fetchTicketItems,
+          fetchTicketCosts, 
+          addTicketCost,
+          fetchTicketFollowups,
+          addTicketFollowup,
+          fetchTicketSolutions,
+          addTicketSolution
+        } = await import('@/services/api/ticketService');
+        
+        // ============================================================
+        // 1. CRÉER LE TICKET DE BASE
+        // ============================================================
+        const newTicket = await createTicket({
+          name: `${originalTicket.title} (Copie ${i + 1})`,
+          content: `--- COPIE DU TICKET #${originalTicket.id} ---\nDate de copie: ${new Date().toLocaleString()}\n\n${originalTicket.description}`,
+          type: originalTicket.type,
+          priority: originalTicket.priority,
+        });
+        
+        // ============================================================
+        // 2. DUPLIQUER LES MATÉRIELS LIÉS
+        // ============================================================
+        if (withItems) {
+          try {
+            const items = await fetchTicketItems(originalTicket.id);
+            for (const item of items) {
+              await associateItemToTicket(newTicket.id, item.itemtype, item.items_id);
+            }
+            console.log(`[Duplication] ${items.length} matériel(s) lié(s) au ticket #${newTicket.id}`);
+          } catch (e) {
+            console.warn(`[Duplication] Erreur lors de la duplication des matériels:`, e);
+          }
+        }
+        
+        // ============================================================
+        // 3. DUPLIQUER LES COÛTS
+        // ============================================================
+        if (withCosts) {
+          try {
+            const costs = await fetchTicketCosts(originalTicket.id);
+            for (const cost of costs) {
+              await addTicketCost(newTicket.id, {
+                name: `[Copie] ${cost.name}`,
+                comment: cost.comment || `Copié depuis le ticket #${originalTicket.id}`,
+                actiontime: cost.actiontime,
+                cost_time: cost.cost_time,
+                cost_fixed: cost.cost_fixed
+              });
+            }
+            console.log(`[Duplication] ${costs.length} coût(s) dupliqué(s) pour le ticket #${newTicket.id}`);
+          } catch (e) {
+            console.warn(`[Duplication] Erreur lors de la duplication des coûts:`, e);
+          }
+        }
+        
+        // ============================================================
+        // 4. DUPLIQUER LES SUIVIS
+        // ============================================================
+        if (withFollowups) {
+          try {
+            const followups = await fetchTicketFollowups(originalTicket.id);
+            for (const followup of followups) {
+              await addTicketFollowup(
+                newTicket.id, 
+                `[Copie du ticket #${originalTicket.id}] ${followup.content}`, 
+                followup.is_private || false
+              );
+            }
+            console.log(`[Duplication] ${followups.length} suivi(s) dupliqué(s) pour le ticket #${newTicket.id}`);
+          } catch (e) {
+            console.warn(`[Duplication] Erreur lors de la duplication des suivis:`, e);
+          }
+        }
+        
+        // ============================================================
+        // 5. DUPLIQUER LES SOLUTIONS
+        // ============================================================
+        if (withSolutions) {
+          try {
+            const solutions = await fetchTicketSolutions(originalTicket.id);
+            for (const solution of solutions) {
+              await addTicketSolution(
+                newTicket.id, 
+                `[Copie du ticket #${originalTicket.id}] ${solution.content}`
+              );
+            }
+            console.log(`[Duplication] ${solutions.length} solution(s) dupliquée(s) pour le ticket #${newTicket.id}`);
+          } catch (e) {
+            console.warn(`[Duplication] Erreur lors de la duplication des solutions:`, e);
+          }
+        }
+        
+        ticketCopies.push({ copyNumber: i + 1, newId: newTicket.id });
+        totalSuccess++;
+        
+      } catch (error: any) {
+        ticketCopies.push({ copyNumber: i + 1, newId: null, error: error.message });
+        totalErrors++;
+      }
+    }
+    
+    results.push({
+      originalId: originalTicket.id,
+      originalTitle: originalTicket.title,
+      copies: ticketCopies
+    });
+  }
+  
+  return {
+    totalRequests,
+    successCount: totalSuccess,
+    errorCount: totalErrors,
+    results
+  };
+}
+
+export async function deleteTicket(
+  tickets: Ticket[],
+  purge: boolean = false
+): Promise<{
+  total: number;
+  deleted: number;
+}> {
+
+  const { default: glpiClient } = await import('./glpiClient');
+  let deletedCount = 0;
+  for (const ticket of tickets) {
+    try {
+      await glpiClient.delete(`/Ticket/${ticket.id}`, {
+        params: purge ? { purge: 1 } : {}
+      });
+      deletedCount++;
+      console.log(`[GLPI] Ticket #${ticket.id} supprimé${purge ? ' définitivement' : ''}`);
+    } catch (error) {
+      console.error(`Erreur lors de la suppression du ticket #${ticket.id}:`, error);
+    }
+  }
+  return {
+    total: tickets.length,
+    deleted: deletedCount
+  };
+}

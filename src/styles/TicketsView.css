@@ -549,3 +549,652 @@ hr {
     padding: 0.15rem 0.5rem;
   }
 }
+
+/* Bouton de duplication groupée */
+.btn-duplicate-batch {
+  background: #8b5cf6;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-duplicate-batch:hover {
+  background: #7c3aed;
+  transform: translateY(-1px);
+}
+
+/* ============================================================ */
+/* MODAL DE DUPLICATION - STRUCTURE AVEC SCROLL CORRECT        */
+/* ============================================================ */
+.modal-content-duplicate {
+  background: white;
+  border-radius: 20px;
+  width: 580px;
+  max-width: 90%;
+  height: auto;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* HEADER - FIXE (ne scroll pas) */
+.modal-content-duplicate .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fafbfc;
+  flex-shrink: 0;
+}
+
+.modal-content-duplicate .modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.modal-content-duplicate .modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 0 0.5rem;
+  transition: color 0.2s;
+}
+
+.modal-content-duplicate .modal-close:hover {
+  color: #475569;
+}
+
+/* BODY - SCROLLABLE */
+.modal-content-duplicate .modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* FOOTER - FIXE (ne scroll pas) */
+.modal-content-duplicate .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e2e8f0;
+  background: #fafbfc;
+  flex-shrink: 0;
+}
+
+/* ============================================================ */
+/* ZONE DES TICKETS SÉLECTIONNÉS */
+/* ============================================================ */
+.selected-list {
+  background: #f1f5f9;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+}
+
+.selected-list > strong {
+  display: block;
+  font-size: 0.8rem;
+  color: #475569;
+  margin-bottom: 0.5rem;
+}
+
+.selected-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  max-height: 100px;
+  overflow-y: auto;
+  padding: 0.25rem 0;
+}
+
+.tag {
+  background: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #3b82f6;
+  border: 1px solid #cbd5e0;
+  font-family: monospace;
+}
+
+/* ============================================================ */
+/* FORMULAIRES - RADIOS ET CHECKBOXES */
+/* ============================================================ */
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group > label {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+/* Groupes de radios horizontaux */
+.radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+}
+
+.radio-group label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 20px;
+  transition: background 0.2s;
+}
+
+.radio-group label:hover {
+  background: #f1f5f9;
+}
+
+.radio-group input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #8b5cf6;
+}
+
+/* Radio personnalisée avec input number */
+.radio-group label:has(input[value="custom"]) {
+  background: #f8fafc;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid #e2e8f0;
+}
+
+.radio-group input[type="number"] {
+  width: 70px;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+/* Groupe de checkboxes vertical */
+.checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: #f8fafc;
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0.25rem 0;
+  transition: background 0.2s;
+}
+
+.checkbox-group label:hover {
+  background: #f1f5f9;
+}
+
+.checkbox-group input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #8b5cf6;
+}
+
+small {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.7rem;
+  color: #64748b;
+}
+
+/* ============================================================ */
+/* PROGRESSION */
+/* ============================================================ */
+.progress-area {
+  margin: 1rem 0;
+}
+
+.progress-bar {
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+  border-radius: 10px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  text-align: center;
+  font-size: 0.7rem;
+  margin-top: 0.5rem;
+  color: #64748b;
+}
+
+/* ============================================================ */
+/* RÉSULTATS DE LA DUPLICATION - SCROLLABLE */
+/* ============================================================ */
+.results-area {
+  margin-top: 1.5rem;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 1rem;
+}
+
+.results-area h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.results-scroll {
+  max-height: 220px;
+  overflow-y: auto;
+  margin-bottom: 0.75rem;
+  padding-right: 4px;
+}
+
+/* Scrollbar personnalisée pour les résultats */
+.results-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.results-scroll::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.results-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.results-scroll::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Chaque groupe de résultat (par ticket original) */
+.result-group {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.result-header {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px dashed #cbd5e0;
+  word-break: break-word;
+}
+
+/* Liste des copies */
+.copies-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.copy-status {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+.copy-status.success {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.copy-status.error {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+/* Résumé des stats */
+.summary-stats {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: #0f172a;
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+
+/* ============================================================ */
+/* BOUTONS DU MODAL */
+/* ============================================================ */
+.modal-content-duplicate .btn-secondary {
+  background-color: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+
+.modal-content-duplicate .btn-secondary:hover:not(:disabled) {
+  background-color: #e2e8f0;
+  border-color: #cbd5e0;
+}
+
+.modal-content-duplicate .btn-primary {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: white;
+  border: none;
+  padding: 0.5rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+
+.modal-content-duplicate .btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.modal-content-duplicate .btn-primary:disabled,
+.modal-content-duplicate .btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ============================================================ */
+/* SCROLLBAR PERSONNALISÉE POUR LE BODY DU MODAL */
+/* ============================================================ */
+.modal-content-duplicate .modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-content-duplicate .modal-body::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 3px;
+}
+
+.modal-content-duplicate .modal-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.modal-content-duplicate .modal-body::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ============================================================ */
+/* STYLES EXISTANTS (conservés) */
+/* ============================================================ */
+
+.btn-edit {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  background: #4299e1;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.btn-edit:hover {
+  background: #3182ce;
+}
+
+.btn-add-cost {
+  padding: 0.5rem 1rem;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  color: #3b82f6;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.btn-add-cost:hover {
+  background: #e2e8f0;
+}
+
+.costs-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.costs-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem;
+  text-align: center;
+}
+
+.costs-card-value {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.costs-card-label {
+  font-size: 0.65rem;
+  color: #64748b;
+}
+
+.detail-costs h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* Overlay commun pour les deux modals */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+/* Modal d'ajout de coût */
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 500px;
+  max-width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Header commun */
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-header h3 {
+  margin: 0;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #94a3b8;
+}
+
+/* Body commun */
+.modal-body {
+  padding: 1.5rem;
+}
+
+/* Footer commun */
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* Formulaires */
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #4a5568;
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.btn-secondary {
+  background-color: #e2e8f0;
+  color: #4a5568;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============================================================ */
+/* RESPONSIVE */
+/* ============================================================ */
+@media (max-width: 640px) {
+  .modal-content-duplicate {
+    width: 95%;
+    max-height: 90vh;
+  }
+  
+  .modal-content-duplicate .modal-body {
+    padding: 1rem;
+  }
+  
+  .radio-group {
+    gap: 0.5rem;
+  }
+  
+  .radio-group label {
+    font-size: 0.75rem;
+  }
+  
+  .checkbox-group {
+    padding: 0.75rem;
+  }
+  
+  .copy-status {
+    font-size: 0.55rem;
+    padding: 0.15rem 0.5rem;
+  }
+  
+  .result-header {
+    font-size: 0.7rem;
+  }
+  
+  .modal-content {
+    width: 95%;
+  }
+}

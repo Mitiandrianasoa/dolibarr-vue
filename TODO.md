@@ -1,7 +1,8 @@
 FO:
   - page pour créer un ticket, on peut associer plusieurs éléments au 
 ticket
-  -  Créer la page pour afficher la liste des éléments 
+  -  Créer la page pour afficher la liste des éléments(ASSETS)
+    
       - avec recherche multi critère 
 
 BO:

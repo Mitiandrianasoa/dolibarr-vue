@@ -1,6 +1,5 @@
 // // services/import/sqliteService.ts
 // import sqlite3 from 'sqlite3'
-// import { open, Database } from 'sqlite'
 
 // // Interfaces
 // export interface Asset {
@@ -45,7 +44,7 @@
 // }
 
 // export class SQLiteService {
-//   private db: Database | null = null
+//   private db: sqlite3.Database | null = null
 //   private dbPath: string
 
 //   constructor(dbPath: string = './glpi_backup.db') {
@@ -53,21 +52,25 @@
 //   }
 
 //   async initialize(): Promise<void> {
-//     this.db = await open({
-//       filename: this.dbPath,
-//       driver: sqlite3.Database
+//     return new Promise((resolve, reject) => {
+//       this.db = new sqlite3.Database(this.dbPath, (err: Error | null) => {
+//         if (err) {
+//           reject(err)
+//         } else {
+//           this.createTables()
+//             .then(() => {
+//               console.log(`✅ SQLite initialisé: ${this.dbPath}`)
+//               resolve()
+//             })
+//             .catch(reject)
+//         }
+//       })
 //     })
-
-//     await this.createTables()
-//     console.log(`✅ SQLite initialisé: ${this.dbPath}`)
 //   }
 
 //   private async createTables(): Promise<void> {
-//     if (!this.db) throw new Error('Base non initialisée')
-
-//     // Table des actifs
-//     await this.db.exec(`
-//       CREATE TABLE IF NOT EXISTS assets (
+//     const queries = [
+//       `CREATE TABLE IF NOT EXISTS assets (
 //         id INTEGER PRIMARY KEY AUTOINCREMENT,
 //         name TEXT UNIQUE NOT NULL,
 //         status TEXT,
@@ -81,12 +84,8 @@
 //         synced_at DATETIME,
 //         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 //         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-//       )
-//     `)
-
-//     // Table des tickets
-//     await this.db.exec(`
-//       CREATE TABLE IF NOT EXISTS tickets (
+//       )`,
+//       `CREATE TABLE IF NOT EXISTS tickets (
 //         id INTEGER PRIMARY KEY AUTOINCREMENT,
 //         ref_ticket TEXT UNIQUE NOT NULL,
 //         date TEXT,
@@ -101,12 +100,8 @@
 //         synced_at DATETIME,
 //         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 //         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-//       )
-//     `)
-
-//     // Table des coûts
-//     await this.db.exec(`
-//       CREATE TABLE IF NOT EXISTS costs (
+//       )`,
+//       `CREATE TABLE IF NOT EXISTS costs (
 //         id INTEGER PRIMARY KEY AUTOINCREMENT,
 //         num_ticket TEXT NOT NULL,
 //         duration_second INTEGER DEFAULT 0,
@@ -115,12 +110,8 @@
 //         total_cost REAL DEFAULT 0,
 //         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 //         FOREIGN KEY (num_ticket) REFERENCES tickets(ref_ticket)
-//       )
-//     `)
-
-//     // Table d'historique des synchronisations
-//     await this.db.exec(`
-//       CREATE TABLE IF NOT EXISTS sync_history (
+//       )`,
+//       `CREATE TABLE IF NOT EXISTS sync_history (
 //         id INTEGER PRIMARY KEY AUTOINCREMENT,
 //         direction TEXT NOT NULL,
 //         entity_type TEXT NOT NULL,
@@ -129,52 +120,83 @@
 //         error_message TEXT,
 //         started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 //         completed_at DATETIME
-//       )
-//     `)
+//       )`,
+//       `CREATE INDEX IF NOT EXISTS idx_assets_glpi_id ON assets(glpi_id)`,
+//       `CREATE INDEX IF NOT EXISTS idx_assets_inventory ON assets(inventory_number)`,
+//       `CREATE INDEX IF NOT EXISTS idx_tickets_glpi_id ON tickets(glpi_id)`,
+//       `CREATE INDEX IF NOT EXISTS idx_tickets_ref ON tickets(ref_ticket)`,
+//       `CREATE INDEX IF NOT EXISTS idx_sync_history_direction ON sync_history(direction)`
+//     ]
 
-//     // Index pour performances
-//     await this.db.exec(`
-//       CREATE INDEX IF NOT EXISTS idx_assets_glpi_id ON assets(glpi_id);
-//       CREATE INDEX IF NOT EXISTS idx_assets_inventory ON assets(inventory_number);
-//       CREATE INDEX IF NOT EXISTS idx_tickets_glpi_id ON tickets(glpi_id);
-//       CREATE INDEX IF NOT EXISTS idx_tickets_ref ON tickets(ref_ticket);
-//       CREATE INDEX IF NOT EXISTS idx_sync_history_direction ON sync_history(direction);
-//     `)
+//     for (const query of queries) {
+//       await this.run(query)
+//     }
+//   }
+
+//   private run(sql: string, params: any[] = []): Promise<{ lastID: number; changes: number }> {
+//     return new Promise((resolve, reject) => {
+//       if (!this.db) {
+//         reject(new Error('Base non initialisée'))
+//         return
+//       }
+//       this.db.run(sql, params, function(this: sqlite3.RunResult, err: Error | null) {
+//         if (err) reject(err)
+//         else resolve({ lastID: this.lastID, changes: this.changes })
+//       })
+//     })
+//   }
+
+//   private get(sql: string, params: any[] = []): Promise<any> {
+//     return new Promise((resolve, reject) => {
+//       if (!this.db) {
+//         reject(new Error('Base non initialisée'))
+//         return
+//       }
+//       this.db.get(sql, params, (err: Error | null, row: any) => {
+//         if (err) reject(err)
+//         else resolve(row)
+//       })
+//     })
+//   }
+
+//   private all(sql: string, params: any[] = []): Promise<any[]> {
+//     return new Promise((resolve, reject) => {
+//       if (!this.db) {
+//         reject(new Error('Base non initialisée'))
+//         return
+//       }
+//       this.db.all(sql, params, (err: Error | null, rows: any[]) => {
+//         if (err) reject(err)
+//         else resolve(rows)
+//       })
+//     })
 //   }
 
 //   // ─── Assets ──────────────────────────────────────────────
 
 //   async getAllAssets(onlyNotSynced: boolean = false): Promise<Asset[]> {
-//     if (!this.db) throw new Error('Base non initialisée')
-    
-//     let query = 'SELECT * FROM assets'
+//     let sql = 'SELECT * FROM assets'
 //     if (onlyNotSynced) {
-//       query += ' WHERE glpi_id IS NULL OR glpi_id = 0'
+//       sql += ' WHERE glpi_id IS NULL OR glpi_id = 0'
 //     }
-//     query += ' ORDER BY name'
-    
-//     return await this.db.all(query)
+//     sql += ' ORDER BY name'
+//     return await this.all(sql)
 //   }
 
 //   async getAssetById(id: number): Promise<Asset | undefined> {
-//     if (!this.db) throw new Error('Base non initialisée')
-//     return await this.db.get('SELECT * FROM assets WHERE id = ?', id)
+//     return await this.get('SELECT * FROM assets WHERE id = ?', [id])
 //   }
 
 //   async getAssetByGlpiId(glpiId: number): Promise<Asset | undefined> {
-//     if (!this.db) throw new Error('Base non initialisée')
-//     return await this.db.get('SELECT * FROM assets WHERE glpi_id = ?', glpiId)
+//     return await this.get('SELECT * FROM assets WHERE glpi_id = ?', [glpiId])
 //   }
 
 //   async getAssetByName(name: string): Promise<Asset | undefined> {
-//     if (!this.db) throw new Error('Base non initialisée')
-//     return await this.db.get('SELECT * FROM assets WHERE name = ?', name)
+//     return await this.get('SELECT * FROM assets WHERE name = ?', [name])
 //   }
 
 //   async insertAsset(asset: Asset): Promise<number> {
-//     if (!this.db) throw new Error('Base non initialisée')
-    
-//     const result = await this.db.run(
+//     const result = await this.run(
 //       `INSERT INTO assets (
 //         name, status, location, manufacturer, item_type, 
 //         model, inventory_number, user_name, glpi_id
@@ -185,13 +207,11 @@
 //         asset.user_name, asset.glpi_id || null
 //       ]
 //     )
-//     return result.lastID!
+//     return result.lastID
 //   }
 
 //   async updateAssetGlpiId(name: string, glpiId: number): Promise<void> {
-//     if (!this.db) throw new Error('Base non initialisée')
-    
-//     await this.db.run(
+//     await this.run(
 //       `UPDATE assets SET glpi_id = ?, synced_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
 //        WHERE name = ?`,
 //       [glpiId, name]
@@ -199,9 +219,7 @@
 //   }
 
 //   async updateAsset(asset: Asset): Promise<void> {
-//     if (!this.db) throw new Error('Base non initialisée')
-    
-//     await this.db.run(
+//     await this.run(
 //       `UPDATE assets SET 
 //         status = ?, location = ?, manufacturer = ?, item_type = ?,
 //         model = ?, inventory_number = ?, user_name = ?, updated_at = CURRENT_TIMESTAMP
@@ -214,57 +232,44 @@
 //   }
 
 //   async deleteAsset(name: string): Promise<void> {
-//     if (!this.db) throw new Error('Base non initialisée')
-//     await this.db.run('DELETE FROM assets WHERE name = ?', name)
+//     await this.run('DELETE FROM assets WHERE name = ?', [name])
 //   }
 
 //   async getAssetsCount(): Promise<number> {
-//     if (!this.db) throw new Error('Base non initialisée')
-//     const result = await this.db.get('SELECT COUNT(*) as count FROM assets')
+//     const result = await this.get('SELECT COUNT(*) as count FROM assets')
 //     return result?.count || 0
 //   }
 
 //   async getAssetsNotSyncedCount(): Promise<number> {
-//     if (!this.db) throw new Error('Base non initialisée')
-//     const result = await this.db.get(
-//       'SELECT COUNT(*) as count FROM assets WHERE glpi_id IS NULL OR glpi_id = 0'
-//     )
+//     const result = await this.get('SELECT COUNT(*) as count FROM assets WHERE glpi_id IS NULL OR glpi_id = 0')
 //     return result?.count || 0
 //   }
 
 //   // ─── Tickets ──────────────────────────────────────────────
 
 //   async getAllTickets(onlyNotSynced: boolean = false): Promise<Ticket[]> {
-//     if (!this.db) throw new Error('Base non initialisée')
-    
-//     let query = 'SELECT * FROM tickets'
+//     let sql = 'SELECT * FROM tickets'
 //     if (onlyNotSynced) {
-//       query += ' WHERE glpi_id IS NULL OR glpi_id = 0'
+//       sql += ' WHERE glpi_id IS NULL OR glpi_id = 0'
 //     }
-//     query += ' ORDER BY ref_ticket'
-    
-//     return await this.db.all(query)
+//     sql += ' ORDER BY ref_ticket'
+//     return await this.all(sql)
 //   }
 
 //   async getTicketById(id: number): Promise<Ticket | undefined> {
-//     if (!this.db) throw new Error('Base non initialisée')
-//     return await this.db.get('SELECT * FROM tickets WHERE id = ?', id)
+//     return await this.get('SELECT * FROM tickets WHERE id = ?', [id])
 //   }
 
 //   async getTicketByRef(ref: string): Promise<Ticket | undefined> {
-//     if (!this.db) throw new Error('Base non initialisée')
-//     return await this.db.get('SELECT * FROM tickets WHERE ref_ticket = ?', ref)
+//     return await this.get('SELECT * FROM tickets WHERE ref_ticket = ?', [ref])
 //   }
 
 //   async getTicketByGlpiId(glpiId: number): Promise<Ticket | undefined> {
-//     if (!this.db) throw new Error('Base non initialisée')
-//     return await this.db.get('SELECT * FROM tickets WHERE glpi_id = ?', glpiId)
+//     return await this.get('SELECT * FROM tickets WHERE glpi_id = ?', [glpiId])
 //   }
 
 //   async insertTicket(ticket: Ticket): Promise<number> {
-//     if (!this.db) throw new Error('Base non initialisée')
-    
-//     const result = await this.db.run(
+//     const result = await this.run(
 //       `INSERT INTO tickets (
 //         ref_ticket, date, heure, type, titre, description, status, priority, items, glpi_id
 //       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -273,13 +278,11 @@
 //         ticket.description, ticket.status, ticket.priority, ticket.items, ticket.glpi_id || null
 //       ]
 //     )
-//     return result.lastID!
+//     return result.lastID
 //   }
 
 //   async updateTicketGlpiId(ref: string, glpiId: number): Promise<void> {
-//     if (!this.db) throw new Error('Base non initialisée')
-    
-//     await this.db.run(
+//     await this.run(
 //       `UPDATE tickets SET glpi_id = ?, synced_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
 //        WHERE ref_ticket = ?`,
 //       [glpiId, ref]
@@ -287,9 +290,7 @@
 //   }
 
 //   async updateTicket(ticket: Ticket): Promise<void> {
-//     if (!this.db) throw new Error('Base non initialisée')
-    
-//     await this.db.run(
+//     await this.run(
 //       `UPDATE tickets SET 
 //         date = ?, heure = ?, type = ?, titre = ?, description = ?,
 //         status = ?, priority = ?, items = ?, updated_at = CURRENT_TIMESTAMP
@@ -302,63 +303,50 @@
 //   }
 
 //   async deleteTicket(ref: string): Promise<void> {
-//     if (!this.db) throw new Error('Base non initialisée')
-//     await this.db.run('DELETE FROM tickets WHERE ref_ticket = ?', ref)
+//     await this.run('DELETE FROM tickets WHERE ref_ticket = ?', [ref])
 //   }
 
 //   async getTicketsCount(): Promise<number> {
-//     if (!this.db) throw new Error('Base non initialisée')
-//     const result = await this.db.get('SELECT COUNT(*) as count FROM tickets')
+//     const result = await this.get('SELECT COUNT(*) as count FROM tickets')
 //     return result?.count || 0
 //   }
 
 //   async getTicketsNotSyncedCount(): Promise<number> {
-//     if (!this.db) throw new Error('Base non initialisée')
-//     const result = await this.db.get(
-//       'SELECT COUNT(*) as count FROM tickets WHERE glpi_id IS NULL OR glpi_id = 0'
-//     )
+//     const result = await this.get('SELECT COUNT(*) as count FROM tickets WHERE glpi_id IS NULL OR glpi_id = 0')
 //     return result?.count || 0
 //   }
 
 //   // ─── Costs ───────────────────────────────────────────────
 
 //   async getAllCosts(): Promise<Cost[]> {
-//     if (!this.db) throw new Error('Base non initialisée')
-//     return await this.db.all('SELECT * FROM costs ORDER BY num_ticket')
+//     return await this.all('SELECT * FROM costs ORDER BY num_ticket')
 //   }
 
 //   async getCostsByTicket(numTicket: string): Promise<Cost[]> {
-//     if (!this.db) throw new Error('Base non initialisée')
-//     return await this.db.all('SELECT * FROM costs WHERE num_ticket = ?', numTicket)
+//     return await this.all('SELECT * FROM costs WHERE num_ticket = ?', [numTicket])
 //   }
 
 //   async insertCost(cost: Cost): Promise<number> {
-//     if (!this.db) throw new Error('Base non initialisée')
-    
 //     const totalCost = (cost.time_cost || 0) + (cost.fixed_cost || 0)
-    
-//     const result = await this.db.run(
+//     const result = await this.run(
 //       `INSERT INTO costs (
 //         num_ticket, duration_second, time_cost, fixed_cost, total_cost
 //       ) VALUES (?, ?, ?, ?, ?)`,
 //       [cost.num_ticket, cost.duration_second || 0, cost.time_cost || 0, cost.fixed_cost || 0, totalCost]
 //     )
-//     return result.lastID!
+//     return result.lastID
 //   }
 
 //   async clearCosts(): Promise<void> {
-//     if (!this.db) throw new Error('Base non initialisée')
-//     await this.db.run('DELETE FROM costs')
+//     await this.run('DELETE FROM costs')
 //   }
 
 //   async deleteCostsByTicket(numTicket: string): Promise<void> {
-//     if (!this.db) throw new Error('Base non initialisée')
-//     await this.db.run('DELETE FROM costs WHERE num_ticket = ?', numTicket)
+//     await this.run('DELETE FROM costs WHERE num_ticket = ?', [numTicket])
 //   }
 
 //   async getCostsCount(): Promise<number> {
-//     if (!this.db) throw new Error('Base non initialisée')
-//     const result = await this.db.get('SELECT COUNT(*) as count FROM costs')
+//     const result = await this.get('SELECT COUNT(*) as count FROM costs')
 //     return result?.count || 0
 //   }
 
@@ -371,9 +359,7 @@
 //     status: 'success' | 'error' | 'partial',
 //     errorMessage?: string
 //   ): Promise<void> {
-//     if (!this.db) throw new Error('Base non initialisée')
-    
-//     await this.db.run(
+//     await this.run(
 //       `INSERT INTO sync_history (direction, entity_type, items_count, status, error_message, completed_at)
 //        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
 //       [direction, entityType, itemsCount, status, errorMessage || null]
@@ -381,17 +367,11 @@
 //   }
 
 //   async getSyncHistory(limit: number = 20): Promise<any[]> {
-//     if (!this.db) throw new Error('Base non initialisée')
-    
-//     return await this.db.all(
-//       `SELECT * FROM sync_history ORDER BY started_at DESC LIMIT ?`,
-//       limit
-//     )
+//     return await this.all('SELECT * FROM sync_history ORDER BY started_at DESC LIMIT ?', [limit])
 //   }
 
 //   async getLastSync(): Promise<any> {
-//     if (!this.db) throw new Error('Base non initialisée')
-//     return await this.db.get('SELECT * FROM sync_history ORDER BY completed_at DESC LIMIT 1')
+//     return await this.get('SELECT * FROM sync_history ORDER BY completed_at DESC LIMIT 1')
 //   }
 
 //   // ─── Utilitaires ─────────────────────────────────────────
@@ -402,16 +382,10 @@
 //     costs: number
 //     lastSync: any
 //   }> {
-//     if (!this.db) throw new Error('Base non initialisée')
-    
 //     const assetsTotal = await this.getAssetsCount()
-//     const assetsSynced = await this.db.get(
-//       'SELECT COUNT(*) as count FROM assets WHERE glpi_id IS NOT NULL AND glpi_id > 0'
-//     )
+//     const assetsSynced = await this.get('SELECT COUNT(*) as count FROM assets WHERE glpi_id IS NOT NULL AND glpi_id > 0')
 //     const ticketsTotal = await this.getTicketsCount()
-//     const ticketsSynced = await this.db.get(
-//       'SELECT COUNT(*) as count FROM tickets WHERE glpi_id IS NOT NULL AND glpi_id > 0'
-//     )
+//     const ticketsSynced = await this.get('SELECT COUNT(*) as count FROM tickets WHERE glpi_id IS NOT NULL AND glpi_id > 0')
 //     const costsTotal = await this.getCostsCount()
 //     const lastSync = await this.getLastSync()
 
@@ -432,16 +406,22 @@
 //   }
 
 //   async clearAllData(): Promise<void> {
-//     if (!this.db) throw new Error('Base non initialisée')
-//     await this.db.exec('DELETE FROM costs')
-//     await this.db.exec('DELETE FROM tickets')
-//     await this.db.exec('DELETE FROM assets')
+//     await this.run('DELETE FROM costs')
+//     await this.run('DELETE FROM tickets')
+//     await this.run('DELETE FROM assets')
 //   }
 
 //   async close(): Promise<void> {
-//     if (this.db) {
-//       await this.db.close()
-//       this.db = null
-//     }
+//     return new Promise((resolve) => {
+//       if (this.db) {
+//         this.db.close((err: Error | null) => {
+//           if (err) console.error('Erreur fermeture DB:', err)
+//           this.db = null
+//           resolve()
+//         })
+//       } else {
+//         resolve()
+//       }
+//     })
 //   }
 // }
