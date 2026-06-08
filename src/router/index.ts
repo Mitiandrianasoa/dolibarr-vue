@@ -49,7 +49,13 @@ const router = createRouter({
           component: () => import('@/views/back/AssetsView.vue'),
           meta: { title: 'Actifs' },
         },
-
+        // Ajoutez cette route
+        {
+          path: '/sync',
+          name: 'Sync',
+          component: () => import('@/views/back/SyncView.vue'),
+          meta: { title: 'Synchronisation GLPI ↔ SQLite' }
+        },
         {
           path: 'users',
           name: 'users',
