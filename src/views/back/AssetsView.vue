@@ -347,7 +347,7 @@ function getStatusClass(status: string): string {
         </select>
       </div>
 
-      <div class="filter-group">
+      <!-- <div class="filter-group">
         <label>Utilisateur</label>
         <select v-model="filters.userId" :disabled="loadingFilters">
           <option value="">Tous les utilisateurs</option>
@@ -355,17 +355,17 @@ function getStatusClass(status: string): string {
             {{ `${user.firstname} ${user.lastname}`.trim() || user.username }}
           </option>
         </select>
-      </div>
+      </div> -->
 
       <div class="filter-group">
         <label>Série</label>
         <input v-model="filters.serial" type="text" placeholder="Numéro de série" @keyup.enter="load" />
       </div>
 
-      <div class="filter-group">
+      <!-- <div class="filter-group">
         <label>Inventaire</label>
         <input v-model="filters.inventoryNumber" type="text" placeholder="Numéro interne" @keyup.enter="load" />
-      </div>
+      </div> -->
 
       <label class="checkbox-filter">
         <input v-model="filters.includeDeleted" type="checkbox" />

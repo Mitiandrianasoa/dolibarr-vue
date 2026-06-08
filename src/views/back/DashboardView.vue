@@ -461,5 +461,4 @@ onMounted(() => {
 <style scoped>
 @import '@/styles/DashboardView.css';
 
-
 </style>
