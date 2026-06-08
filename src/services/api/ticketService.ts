@@ -530,29 +530,44 @@ export async function duplicateTicketBatch(
   };
 }
 
+// ticketService.ts
+
 export async function deleteTicket(
-  tickets: Ticket[],
+  ticketsId: number[],
   purge: boolean = false
 ): Promise<{
-  total: number;
-  deleted: number;
+  totalRequests: number;
+  successCount: number;
+  errorCount: number;
+  results: Array<{ id: number; success: boolean; error?: string }>;
 }> {
-
   const { default: glpiClient } = await import('./glpiClient');
-  let deletedCount = 0;
-  for (const ticket of tickets) {
+  
+  const results = [];
+  let successCount = 0;
+  let errorCount = 0;
+  
+  for (const ticketId of ticketsId) {
     try {
-      await glpiClient.delete(`/Ticket/${ticket.id}`, {
-        params: purge ? { purge: 1 } : {}
+      await glpiClient.delete(`/Ticket/${ticketId}`, {
+        params: purge ? { force_purge: true } : {}
       });
-      deletedCount++;
-      console.log(`[GLPI] Ticket #${ticket.id} supprimé${purge ? ' définitivement' : ''}`);
-    } catch (error) {
-      console.error(`Erreur lors de la suppression du ticket #${ticket.id}:`, error);
+      
+      results.push({ id: ticketId, success: true });
+      successCount++;
+      console.log(`[GLPI] Ticket #${ticketId} supprimé${purge ? ' définitivement' : ''}`);
+      
+    } catch (error: any) {
+      results.push({ id: ticketId, success: false, error: error.message });
+      errorCount++;
+      console.error(`Erreur lors de la suppression du ticket #${ticketId}:`, error);
     }
   }
+  
   return {
-    total: tickets.length,
-    deleted: deletedCount
+    totalRequests: ticketsId.length,
+    successCount,
+    errorCount,
+    results
   };
 }
