@@ -1,8 +1,16 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { fetchAllTickets, fetchTicketItems } from '@/services/api/ticketService'
-import type { Ticket, TicketStatus, TicketPriority } from '@/models/Ticket'
+import { 
+  fetchAllTickets, 
+  fetchTicketItems,
+  fetchTicketCosts,
+  getTicketCostSummary,
+  addTicketCost,
+  type TicketCost,
+  type TicketCostSummary
+} from '@/services/api/ticketService'
+import type { Ticket, TicketStatus } from '@/models/Ticket'
 
 const router = useRouter()
 const loading = ref(false)
@@ -10,6 +18,22 @@ const tickets = ref<Ticket[]>([])
 const selectedTicket = ref<Ticket | null>(null)
 const selectedTicketItems = ref<any[]>([])
 const loadingItems = ref(false)
+
+// Variables pour les coûts
+const ticketCosts = ref<TicketCost[]>([])
+const ticketCostSummary = ref<TicketCostSummary | null>(null)
+const loadingCosts = ref(false)
+const showCostsModal = ref(false)
+const savingCost = ref(false)
+
+// Nouveau coût
+const newCost = ref({
+  name: '',
+  hours: 0,
+  cost_time: 0,
+  cost_fixed: 0,
+  comment: ''
+})
 
 const activeStatus = ref('all')
 const statuses = [
@@ -44,14 +68,26 @@ async function load() {
 async function selectTicket(ticket: Ticket) {
   selectedTicket.value = ticket
   selectedTicketItems.value = []
+  ticketCosts.value = []
+  ticketCostSummary.value = null
   loadingItems.value = true
+  loadingCosts.value = true
+  
   try {
-    const items = await fetchTicketItems(ticket.id)
+    const [items, costs, costSummary] = await Promise.all([
+      fetchTicketItems(ticket.id),
+      fetchTicketCosts(ticket.id),
+      getTicketCostSummary(ticket.id)
+    ])
+    
     selectedTicketItems.value = items || []
+    ticketCosts.value = costs || []
+    ticketCostSummary.value = costSummary
   } catch (error) {
-    console.error("Erreur lors du chargement des éléments associés:", error)
+    console.error("Erreur lors du chargement:", error)
   } finally {
     loadingItems.value = false
+    loadingCosts.value = false
   }
 }
 
@@ -67,12 +103,77 @@ function formatDate(dateString?: string): string {
   })
 }
 
+function formatNumber(value: any): string {
+  if (value === undefined || value === null) return '0.00'
+  const num = typeof value === 'number' ? value : parseFloat(value)
+  if (isNaN(num)) return '0.00'
+  return num.toFixed(2)
+}
+
+function formatDuration(seconds: any): string {
+  const secs = typeof seconds === 'number' ? seconds : parseInt(seconds) || 0
+  const hours = Math.floor(secs / 3600)
+  const minutes = Math.floor((secs % 3600) / 60)
+  if (hours === 0 && minutes === 0) return '-'
+  if (hours === 0) return `${minutes} min`
+  if (minutes === 0) return `${hours} h`
+  return `${hours}h ${minutes}min`
+}
+
+async function saveCost() {
+  if (!newCost.value.name) {
+    alert('Veuillez saisir un libellé')
+    return
+  }
+  
+  savingCost.value = true
+  
+  try {
+    const actiontime = (newCost.value.hours || 0) * 3600
+    
+    await addTicketCost(selectedTicket.value!.id, {
+      name: newCost.value.name,
+      comment: newCost.value.comment,
+      actiontime: actiontime,
+      cost_time: newCost.value.cost_time,
+      cost_fixed: newCost.value.cost_fixed
+    })
+    
+    // Recharger les coûts
+    const [costs, costSummary] = await Promise.all([
+      fetchTicketCosts(selectedTicket.value!.id),
+      getTicketCostSummary(selectedTicket.value!.id)
+    ])
+    
+    ticketCosts.value = costs
+    ticketCostSummary.value = costSummary
+    
+    // Réinitialiser le formulaire
+    newCost.value = {
+      name: '',
+      hours: 0,
+      cost_time: 0,
+      cost_fixed: 0,
+      comment: ''
+    }
+    
+    showCostsModal.value = false
+  } catch (error) {
+    console.error('Erreur lors de l\'ajout du coût:', error)
+    alert('Erreur lors de l\'ajout du coût')
+  } finally {
+    savingCost.value = false
+  }
+}
+
 const STATUS_LABELS: Record<TicketStatus, string> = {
   1: 'Nouveau', 2: 'En cours', 3: 'Planifié', 4: 'En attente', 5: 'Résolu', 6: 'Fermé',
 }
+
 function statusLabel(status: TicketStatus): string {
   return STATUS_LABELS[status] ?? 'Inconnu'
 }
+
 function statusClass(status: TicketStatus): string {
   const a: Record<TicketStatus, string> = {
     1: 'badge-blue', 2: 'badge-orange', 3: 'badge-orange', 4: 'badge-gray', 5: 'badge-green', 6: 'badge-gray',
@@ -96,7 +197,7 @@ onMounted(load)
         </div>
         <div>
           <h1 class="mv-title">Tickets</h1>
-          <p class="mv-sub">Suivi de l'assistance — <code>GET /Ticket</code></p>
+          <p class="mv-sub">Suivi de l'assistance — API GLPI</p>
         </div>
       </div>
       <div class="mv-actions">
@@ -156,7 +257,7 @@ onMounted(load)
             </tbody>
           </table>
         </div>
-    </div>
+      </div>
 
       <!-- Fiche du Ticket -->
       <div class="ticket-detail card" v-if="selectedTicket">
@@ -171,6 +272,7 @@ onMounted(load)
           <span class="badge badge-gray">Priorité: {{ selectedTicket.priorityLabel }}</span>
         </div>
         <hr />
+        
         <div class="detail-dates">
           <p><strong>Créé le :</strong> {{ formatDate(selectedTicket.createdAt) }}</p>
           <p><strong>Modifié le :</strong> {{ formatDate(selectedTicket.updatedAt) }}</p>
@@ -178,11 +280,13 @@ onMounted(load)
           <p><strong>Clos le :</strong> {{ formatDate(selectedTicket.closedAt) || 'Non clos' }}</p>
         </div>
         <hr />
+        
         <div class="detail-content">
           <h4>Description</h4>
           <div class="html-content" v-html="selectedTicket.description"></div>
         </div>
         <hr />
+        
         <div class="detail-items">
           <h4>Éléments associés (Matériels liés)</h4>
           <div v-if="loadingItems" class="loading-state">Chargement des éléments...</div>
@@ -193,582 +297,252 @@ onMounted(load)
           </ul>
           <p v-else class="empty-state">Aucun matériel lié à ce ticket.</p>
         </div>
-        <button class="btn-edit" @click="router.push(`/tickets/${selectedTicket.id}/edit`)">
-          Modifier
-        </button>
         <hr />
+        
+        <!-- SECTION COÛTS -->
+        <div class="detail-costs">
+          <h4>Coûts du ticket</h4>
+          
+          <div v-if="loadingCosts" class="loading-state">Chargement des coûts...</div>
+          <div v-else-if="ticketCostSummary" class="costs-summary-grid">
+            <div class="costs-card">
+              <div class="costs-card-content">
+                <span class="costs-card-value">{{ formatNumber(ticketCostSummary.totalCost) }} €</span>
+                <span class="costs-card-label">Coût total</span>
+              </div>
+            </div>
+            <div class="costs-card">
+              <div class="costs-card-content">
+                <span class="costs-card-value">{{ ticketCostSummary.totalTimeFormatted }}</span>
+                <span class="costs-card-label">Temps passé</span>
+              </div>
+            </div>
+            <div class="costs-card">
+              <div class="costs-card-content">
+                <span class="costs-card-value">{{ formatNumber(ticketCostSummary.costTime) }} €</span>
+                <span class="costs-card-label">Coût horaire</span>
+              </div>
+            </div>
+            <div class="costs-card">
+              <div class="costs-card-content">
+                <span class="costs-card-value">{{ formatNumber(ticketCostSummary.costFixed) }} €</span>
+                <span class="costs-card-label">Coût fixe</span>
+              </div>
+            </div>
+          </div>
+          
+          <div v-else class="empty-state">Aucun coût enregistré pour ce ticket</div>
+          
+          <button class="btn-add-cost" @click="showCostsModal = true">
+            + Ajouter un coût
+          </button>
+        </div>
+        <hr />
+        
+        <button class="btn-edit" @click="router.push(`/tickets/${selectedTicket.id}/edit`)">
+          Modifier le ticket
+        </button>
       </div>
+      
       <div class="ticket-detail-placeholder card" v-else>
         <p>Sélectionnez un ticket dans la liste pour voir sa fiche détaillée.</p>
       </div>
-      
-      
+    </div>
+
+    <!-- Modal d'ajout de coût -->
+    <div v-if="showCostsModal" class="modal-overlay" @click.self="showCostsModal = false">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Ajouter un coût</h3>
+          <button class="modal-close" @click="showCostsModal = false">×</button>
+        </div>
+        
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Libellé *</label>
+            <input v-model="newCost.name" type="text" placeholder="Ex: Intervention sur site" />
+          </div>
+          <div class="form-group">
+            <label>Durée (heures)</label>
+            <input v-model.number="newCost.hours" type="number" step="0.5" placeholder="0" />
+          </div>
+          <div class="form-group">
+            <label>Coût horaire (€/h)</label>
+            <input v-model.number="newCost.cost_time" type="number" step="0.01" placeholder="0.00" />
+          </div>
+          <div class="form-group">
+            <label>Coût fixe (€)</label>
+            <input v-model.number="newCost.cost_fixed" type="number" step="0.01" placeholder="0.00" />
+          </div>
+          <div class="form-group">
+            <label>Commentaire</label>
+            <textarea v-model="newCost.comment" rows="2" placeholder="Détails supplémentaires..."></textarea>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="showCostsModal = false">Annuler</button>
+          <button class="btn-primary" @click="saveCost" :disabled="savingCost">
+            {{ savingCost ? 'Ajout...' : 'Ajouter' }}
+          </button>
+        </div>
+      </div>
     </div>
   </div>
-
 </template>
 
 <style scoped>
-.module-view {
-  padding: 1.5rem;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: #f8fafc;
-  min-height: 100vh;
-}
-
-/* ============================================
-   HEADER
-   ============================================ */
-.mv-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.mv-title-wrap {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.mv-title {
-  margin: 0;
-  font-size: 1.5rem;
-  color: #0f172a;
-  font-weight: 700;
-}
-
-.mv-sub {
-  margin: 0.25rem 0 0;
-  color: #64748b;
-  font-size: 0.875rem;
-}
-
-.mv-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.icon-orange {
-  background-color: #ffedd5;
-  color: #ea580c;
-}
-
-.mv-actions {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-/* ============================================
-   FILTRES & BOUTONS
-   ============================================ */
-
-.detail-actions {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
+@import '@/styles/TicketsView.css';
 
 .btn-edit {
-  padding: 0.25rem 0.75rem;
+  padding: 0.5rem 1rem;
   border-radius: 6px;
   background: #4299e1;
   color: white;
   border: none;
   cursor: pointer;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  width: 100%;
+  margin-top: 0.5rem;
 }
 
 .btn-edit:hover {
   background: #3182ce;
 }
 
-.filter-tabs {
-  display: flex;
+.btn-add-cost {
+  padding: 0.5rem 1rem;
   background: #f1f5f9;
-  padding: 0.25rem;
-  border-radius: 10px;
-  gap: 0.25rem;
-}
-
-.tab {
-  border: none;
-  background: none;
-  padding: 0.5rem 1.25rem;
-  border-radius: 8px;
-  cursor: pointer;
-  color: #475569;
-  font-weight: 600;
-  font-size: 0.875rem;
-  transition: all 0.2s ease;
-}
-
-.tab.active {
-  background: white;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
   color: #3b82f6;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+  margin-top: 0.5rem;
 }
 
-.tab:hover:not(.active) {
+.btn-add-cost:hover {
   background: #e2e8f0;
 }
 
-.btn-fetch, .btn-primary {
-  padding: 0.5rem 1.25rem;
-  border: none;
+.costs-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.costs-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
-  font-weight: 600;
-  font-size: 0.875rem;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: all 0.2s ease;
+  padding: 0.75rem;
+  text-align: center;
 }
 
-.btn-orange {
-  background-color: #f97316;
-  color: white;
-}
-
-.btn-orange:hover {
-  background-color: #ea580c;
-  transform: translateY(-1px);
-}
-
-.btn-primary {
-  background-color: #3b82f6;
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: #2563eb;
-  transform: translateY(-1px);
-}
-
-.spin-icon {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* ============================================
-   LAYOUT PRINCIPAL
-   ============================================ */
-.tickets-layout {
-  display: flex;
-  gap: 1.5rem;
-  flex: 1;
-  min-height: 0;
-}
-
-/* CARTE LISTE */
-.tickets-list {
-  flex: 3;
-  min-width: 0;
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid #e2e8f0;
-}
-
-/* CARTE DETAIL */
-.ticket-detail,
-.ticket-detail-placeholder {
-  flex: 1;
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #e2e8f0;
-}
-
-/* ============================================
-   LISTE DES TICKETS - STYLE TABLEAU
-   ============================================ */
-.tickets-list h3 {
-  padding: 1rem 1.25rem;
-  margin: 0;
-  border-bottom: 1px solid #e2e8f0;
+.costs-card-value {
+  display: block;
   font-size: 1rem;
   font-weight: 700;
   color: #0f172a;
-  background: #fafbfc;
-  flex-shrink: 0;
 }
 
-/* Conteneur avec défilement */
-.list-container {
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
-}
-
-/* STYLE TABLEAU */
-.tickets-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 600px;
-}
-
-.tickets-table th {
-  position: sticky;
-  top: 0;
-  background: #f8fafc;
-  padding: 0.875rem 1rem;
-  text-align: left;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: #475569;
-  border-bottom: 2px solid #e2e8f0;
-  z-index: 10;
-}
-
-.tickets-table td {
-  padding: 0.875rem 1rem;
-  border-bottom: 1px solid #f1f5f9;
-  vertical-align: middle;
-}
-
-/* Lignes cliquables */
-.clickable-row {
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.clickable-row:hover {
-  background: #f8fafc;
-}
-
-.clickable-row.selected {
-  background: #eff6ff;
-  border-left: 3px solid #3b82f6;
-}
-
-.clickable-row.selected td:first-child {
-  border-left: 3px solid #3b82f6;
-  padding-left: calc(1rem - 3px);
-}
-
-/* Colonnes spécifiques */
-.col-id {
-  font-weight: 700;
-  color: #3b82f6;
-  font-family: monospace;
-  font-size: 0.85rem;
-  white-space: nowrap;
-}
-
-.col-title {
-  font-weight: 600;
-  color: #0f172a;
-  max-width: 300px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.col-title:hover {
-  white-space: normal;
-  word-break: break-word;
-}
-
-.col-date {
-  font-size: 0.75rem;
+.costs-card-label {
+  font-size: 0.65rem;
   color: #64748b;
-  white-space: nowrap;
 }
 
-/* Badges dans le tableau */
-.badge {
-  display: inline-block;
-  padding: 0.2rem 0.6rem;
-  border-radius: 20px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  white-space: nowrap;
+.detail-costs h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #0f172a;
 }
 
-.badge-blue { background: #dbeafe; color: #1e40af; }
-.badge-orange { background: #ffedd5; color: #c2410c; }
-.badge-green { background: #dcfce7; color: #166534; }
-.badge-red { background: #fee2e2; color: #991b1b; }
-.badge-gray { background: #f1f5f9; color: #475569; }
-
-/* Statut avec indicateur visuel */
-.status-cell {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.status-dot.status-1 { background: #3b82f6; box-shadow: 0 0 0 2px #dbeafe; }
-.status-dot.status-2 { background: #f97316; box-shadow: 0 0 0 2px #ffedd5; }
-.status-dot.status-3 { background: #f97316; box-shadow: 0 0 0 2px #ffedd5; }
-.status-dot.status-4 { background: #94a3b8; box-shadow: 0 0 0 2px #f1f5f9; }
-.status-dot.status-5 { background: #22c55e; box-shadow: 0 0 0 2px #dcfce7; }
-.status-dot.status-6 { background: #64748b; box-shadow: 0 0 0 2px #f1f5f9; }
-
-/* ============================================
-   DÉTAIL DU TICKET
-   ============================================ */
-.ticket-detail {
-  padding: 1rem;
-  overflow-y: auto;
-  max-height: calc(100vh - 140px);
-}
-
-.ticket-detail-placeholder {
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #94a3b8;
-  font-size: 0.875rem;
-  padding: 2rem;
-  text-align: center;
+  z-index: 1000;
 }
 
-.detail-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.detail-header h3 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.btn-close {
-  background: none;
-  border: none;
-  font-size: 1.25rem;
-  cursor: pointer;
-  color: #94a3b8;
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
-  transition: all 0.15s ease;
-}
-
-.btn-close:hover {
-  background: #f1f5f9;
-  color: #475569;
-}
-
-.ticket-detail h2 {
-  margin: 0 0 0.75rem 0;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #0f172a;
-  word-break: break-word;
-  line-height: 1.4;
-}
-
-.detail-badges {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  flex-wrap: wrap;
-}
-
-.detail-dates p {
-  margin: 0.25rem 0;
-  color: #475569;
-  font-size: 0.8rem;
-}
-
-.detail-dates strong {
-  color: #0f172a;
-}
-
-.detail-content h4 {
-  margin: 0 0 0.5rem 0;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.html-content {
-  background: #f8fafc;
-  padding: 0.75rem;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  font-size: 0.8rem;
-  max-height: 200px;
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 500px;
+  max-width: 90%;
+  max-height: 90vh;
   overflow-y: auto;
 }
 
-.detail-items h4 {
-  margin: 0 0 0.5rem 0;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #0f172a;
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
 }
 
-.items-list {
-  list-style: none;
-  padding: 0;
+.modal-header h3 {
   margin: 0;
 }
 
-.items-list li {
-  padding: 0.5rem 0;
-  border-bottom: 1px solid #f1f5f9;
-  font-size: 0.8rem;
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #94a3b8;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.modal-footer {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-hr {
-  border: 0;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
   border-top: 1px solid #e2e8f0;
-  margin: 1rem 0;
 }
 
-.loading-state, .empty-state {
-  padding: 2rem;
-  text-align: center;
-  color: #64748b;
-  font-size: 0.875rem;
+.form-group {
+  margin-bottom: 1rem;
 }
 
-/* ============================================
-   SCROLLBAR
-   ============================================ */
-.list-container::-webkit-scrollbar,
-.ticket-detail::-webkit-scrollbar,
-.html-content::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #4a5568;
 }
 
-.list-container::-webkit-scrollbar-track,
-.ticket-detail::-webkit-scrollbar-track,
-.html-content::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 3px;
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  box-sizing: border-box;
 }
 
-.list-container::-webkit-scrollbar-thumb,
-.ticket-detail::-webkit-scrollbar-thumb,
-.html-content::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
-}
-
-.list-container::-webkit-scrollbar-thumb:hover,
-.ticket-detail::-webkit-scrollbar-thumb:hover,
-.html-content::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-/* ============================================
-   RESPONSIVE
-   ============================================ */
-@media (max-width: 1000px) {
-  .tickets-layout {
-    flex-direction: column;
-  }
-  
-  .tickets-list,
-  .ticket-detail,
-  .ticket-detail-placeholder {
-    flex: 1;
-    max-width: 100%;
-  }
-  
-  .list-container {
-    max-height: 500px;
-  }
-  
-  .ticket-detail {
-    max-height: none;
-  }
-  
-  .col-title {
-    max-width: 200px;
-  }
-}
-
-@media (max-width: 768px) {
-  .module-view {
-    padding: 1rem;
-  }
-  
-  .mv-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  
-  .mv-actions {
-    width: 100%;
-    flex-wrap: wrap;
-  }
-  
-  .filter-tabs {
-    flex: 1;
-    justify-content: stretch;
-  }
-  
-  .tab {
-    flex: 1;
-    text-align: center;
-  }
-  
-  .btn-fetch, .btn-primary {
-    flex: 1;
-    justify-content: center;
-  }
-  
-  .tickets-table th,
-  .tickets-table td {
-    padding: 0.625rem 0.75rem;
-  }
-  
-  .col-id {
-    font-size: 0.75rem;
-  }
-  
-  .col-title {
-    max-width: 150px;
-    font-size: 0.8rem;
-  }
-  
-  .badge {
-    font-size: 0.65rem;
-    padding: 0.15rem 0.5rem;
-  }
+.btn-secondary {
+  background-color: #e2e8f0;
+  color: #4a5568;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
 }
 </style>

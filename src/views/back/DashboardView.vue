@@ -31,7 +31,7 @@
         </div>
       </div>
 
-      <!-- KPI Grid - Assets -->
+      <!-- KPI Grid - Assets par type -->
       <div class="kpi-grid">
         <div class="kpi-card blue">
           <div class="kpi-value">{{ stats?.assets.total || 0 }}</div>
@@ -50,6 +50,24 @@
         </div>
       </div>
 
+      <!-- NOUVEAU : KPI Grid - Assets par statut -->
+      <div class="kpi-subtitle">
+        <h3>Par statut</h3>
+      </div>
+      <div class="kpi-grid">
+        <template v-for="(count, status) in sortedAssetStatuses" :key="status">
+          <div 
+            v-if="count > 0"
+            class="kpi-card"
+            :class="getAssetStatusCardColor(status)"
+          >
+            <div class="kpi-value">{{ count }}</div>
+            <div class="kpi-label">{{ getAssetStatusLabel(status) }}</div>
+            <div class="kpi-sub">{{ getAssetStatusDescription(status) }}</div>
+          </div>
+        </template>
+      </div>
+
       <!-- Tableau des assets récents -->
       <div class="data-table-container">
         <div class="table-header">
@@ -65,8 +83,6 @@
               <th>Nom</th>
               <th>Type</th>
               <th>Statut</th>
-              <!-- <th>Localisation</th>
-              <th>Utilisateur</th> -->
             </tr>
           </thead>
           <tbody>
@@ -74,9 +90,7 @@
               <td class="col-id">#{{ asset.id }}</td>
               <td class="col-name">{{ asset.name }}</td>
               <td><span class="badge" :class="getAssetBadgeClass(asset.type)">{{ getAssetTypeLabel(asset.type) }}</span></td>
-              <td><span class="status-badge" :class="getStatusClass(asset.status)">{{ asset.status }}</span></td>
-              <!-- <td>{{ asset.locationName || '-' }}</td>
-              <td>{{ asset.userName || '-' }}</td> -->
+              <td><span class="status-badge" :class="getAssetStatusBadgeClass(asset.status)">{{ asset.status }}</span></td>
             </tr>
           </tbody>
         </table>
@@ -120,6 +134,24 @@
         </div>
       </div>
 
+      <!-- KPI Grid - Tickets par Statut -->
+      <div class="kpi-subtitle">
+        <h3>Par statut</h3>
+      </div>
+      <div class="kpi-grid">
+        <template v-for="statusId in [1,2,3,4,5,6]" :key="statusId">
+          <div 
+            v-if="(stats?.tickets.byStatus[statusId] || 0) > 0"
+            class="kpi-card"
+            :class="getStatusCardColor(statusId)"
+          >
+            <div class="kpi-value">{{ stats?.tickets.byStatus[statusId] || 0 }}</div>
+            <div class="kpi-label">{{ getStatusLabel(statusId) }}</div>
+            <div class="kpi-sub">{{ getStatusDescription(statusId) }}</div>
+          </div>
+        </template>
+      </div>
+
       <!-- Tableau des tickets récents -->
       <div class="data-table-container">
         <div class="table-header">
@@ -153,6 +185,7 @@
         <div v-else class="empty-state">Aucun ticket trouvé</div>
       </div>
     </div>
+    
 
     <!-- API Info Banner -->
     <div class="api-banner animate-in" v-if="apiError">
@@ -167,7 +200,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { getDashboardStats, ASSET_TYPE_LABELS, type DashboardStats } from '@/services/api/dashboardService'
+import { getDashboardStats,TICKET_STATUS_LABELS, ASSET_TYPE_LABELS, type DashboardStats } from '@/services/api/dashboardService'
 import { fetchAllTickets } from '@/services/api/ticketService'
 import { fetchAllAssets, getAssetStatusById} from '@/services/api/assetService'
 
@@ -227,17 +260,79 @@ function getAssetBadgeClass(type: string): string {
   return classes[type] || 'badge-gray'
 }
 
-function getStatusClass(status: string): string {
-  const statusMap: Record<string, string> = {
-    'En production': 'status-production',
+
+// NOUVEAU : Trier les statuts des assets
+const sortedAssetStatuses = computed(() => {
+  if (!stats.value) return {}
+  const entries = Object.entries(stats.value.assets.byStatus)
+  // Ordre personnalisé
+  const order = ['En service', 'En stock', 'En maintenance', 'En panne', 'Réformé']
+  entries.sort((a, b) => {
+    const indexA = order.indexOf(a[0])
+    const indexB = order.indexOf(b[0])
+    if (indexA === -1 && indexB === -1) return a[0].localeCompare(b[0])
+    if (indexA === -1) return 1
+    if (indexB === -1) return -1
+    return indexA - indexB
+  })
+  return Object.fromEntries(entries)
+})
+
+// Nouvelles fonctions pour les statuts des assets
+function getAssetStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    'En service': 'En service',
+    'En stock': 'En stock',
+    'En maintenance': 'En maintenance',
+    'En panne': 'En panne',
+    'Réformé': 'Réformé'
+  }
+  return labels[status] || status
+}
+function getAssetStatusDescription(status: string): string {
+  const descriptions: Record<string, string> = {
+    'En service': 'Équipements opérationnels',
+    'En stock': 'En réserve',
+    'En maintenance': 'En réparation',
+    'En panne': 'Hors service',
+    'Réformé': 'Retiré du parc'
+  }
+  return descriptions[status] || ''
+}
+
+function getAssetStatusCardColor(status: string): string {
+  const colors: Record<string, string> = {
+    'En service': 'green',
+    'En stock': 'yellow',
+    'En maintenance': 'orange',
+    'En panne': 'red',
+    'Réformé': 'gray'
+  }
+  return colors[status] || 'gray'
+}
+
+function getAssetStatusBadgeClass(status: string): string {
+  const classes: Record<string, string> = {
     'En service': 'status-production',
     'En stock': 'status-stock',
-    'Réformé': 'status-reformed',
     'En maintenance': 'status-maintenance',
-    'En panne': 'status-panne'
+    'En panne': 'status-panne',
+    'Réformé': 'status-reformed'
   }
-  return statusMap[status] || 'status-default'
+  return classes[status] || 'status-default'
 }
+
+// function getStatusClass(status: string): string {
+//   const statusMap: Record<string, string> = {
+//     'En production': 'status-production',
+//     'En service': 'status-production',
+//     'En stock': 'status-stock',
+//     'Réformé': 'status-reformed',
+//     'En maintenance': 'status-maintenance',
+//     'En panne': 'status-panne'
+//   }
+//   return statusMap[status] || 'status-default'
+// }
 
 // Helpers Tickets
 function getTicketStatusClass(status: number): string {
@@ -266,11 +361,33 @@ function getPriorityLabel(priority: number): string {
   return labels[priority] || 'Moyenne'
 }
 
-function getStatusLabel(status: number): string {
-  const labels: Record<number, string> = {
-    1: 'Nouveau', 2: 'En cours', 3: 'Planifié', 4: 'En attente', 5: 'Résolu', 6: 'Fermé'
-  }
-  return labels[status] || 'Inconnu'
+// Nouvelles fonctions pour les statuts
+function getStatusLabel(statusId: number): string {
+  return TICKET_STATUS_LABELS[statusId] || 'Inconnu';
+}
+
+function getStatusDescription(statusId: number): string {
+  const descriptions: Record<number, string> = {
+    1: 'Ticket nouvellement créé',
+    2: 'En cours de traitement',
+    3: 'Action planifiée',
+    4: 'En attente d\'information',
+    5: 'Problème résolu',
+    6: 'Ticket fermé'
+  };
+  return descriptions[statusId] || '';
+}
+
+function getStatusCardColor(statusId: number): string {
+  const colors: Record<number, string> = {
+    1: 'blue',
+    2: 'orange',
+    3: 'orange',
+    4: 'gray',
+    5: 'green',
+    6: 'gray'
+  };
+  return colors[statusId] || 'gray';
 }
 
 // Chargement des données
@@ -344,286 +461,5 @@ onMounted(() => {
 <style scoped>
 @import '@/styles/DashboardView.css';
 
-/* Styles supplémentaires */
-.dashboard-section {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-}
 
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1.5rem;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.section-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.section-sub {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  margin-top: 0.25rem;
-}
-
-.section-total {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.total-badge {
-  background: var(--bg-hover);
-  padding: 0.375rem 0.875rem;
-  border-radius: 20px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-/* KPI Cards */
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.kpi-card {
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 1rem;
-  transition: all 0.2s ease;
-}
-
-.kpi-card.blue { border-left: 4px solid #3b82f6; }
-.kpi-card.orange { border-left: 4px solid #f97316; }
-.kpi-card.red { border-left: 4px solid #ef4444; }
-.kpi-card.green { border-left: 4px solid #22c55e; }
-.kpi-card.cyan { border-left: 4px solid #06b6d4; }
-.kpi-card.purple { border-left: 4px solid #8b5cf6; }
-.kpi-card.gray { border-left: 4px solid #94a3b8; }
-
-.kpi-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-}
-
-.kpi-value {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  line-height: 1.2;
-}
-
-.kpi-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-top: 0.25rem;
-}
-
-.kpi-sub {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  margin-top: 0.25rem;
-}
-
-/* Data Table */
-.data-table-container {
-  margin-top: 1rem;
-}
-
-.table-header {
-  margin-bottom: 1rem;
-}
-
-.table-header h3 {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.data-table th {
-  text-align: left;
-  padding: 0.75rem 0.5rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border);
-}
-
-.data-table td {
-  padding: 0.75rem 0.5rem;
-  font-size: 0.8rem;
-  color: var(--text-primary);
-  border-bottom: 1px solid var(--border);
-}
-
-.col-id {
-  font-family: monospace;
-  font-weight: 600;
-  color: var(--accent);
-  width: 60px;
-}
-
-.col-name {
-  font-weight: 500;
-}
-
-.col-date {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-/* Badges */
-.badge {
-  display: inline-block;
-  padding: 0.2rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.7rem;
-  font-weight: 600;
-}
-
-.badge-blue { background: #dbeafe; color: #1e40af; }
-.badge-green { background: #dcfce7; color: #166534; }
-.badge-orange { background: #ffedd5; color: #c2410c; }
-.badge-purple { background: #f3e8ff; color: #6b21a5; }
-.badge-cyan { background: #ecfeff; color: #0891b2; }
-.badge-red { background: #fee2e2; color: #991b1b; }
-.badge-gray { background: #f1f5f9; color: #475569; }
-
-.status-badge {
-  display: inline-block;
-  padding: 0.2rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.7rem;
-  font-weight: 600;
-}
-
-.status-production { background: #dcfce7; color: #166534; }
-.status-stock { background: #fef9c3; color: #854d0e; }
-.status-reformed { background: #fee2e2; color: #991b1b; }
-.status-maintenance { background: #ffedd5; color: #c2410c; }
-.status-panne { background: #fef2f2; color: #b91c1c; }
-.status-default { background: #f1f5f9; color: #475569; }
-
-.status-new { background: #dbeafe; color: #1e40af; }
-.status-progress { background: #ffedd5; color: #c2410c; }
-.status-planned { background: #f3e8ff; color: #6b21a5; }
-.status-pending { background: #fef9c3; color: #854d0e; }
-.status-solved { background: #dcfce7; color: #166534; }
-.status-closed { background: #f1f5f9; color: #475569; }
-
-.priority-badge {
-  display: inline-block;
-  padding: 0.2rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.7rem;
-  font-weight: 600;
-}
-
-.priority-critical { background: #fee2e2; color: #991b1b; }
-.priority-high { background: #ffedd5; color: #c2410c; }
-.priority-medium { background: #dbeafe; color: #1e40af; }
-.priority-low { background: #f1f5f9; color: #475569; }
-
-/* Loading state */
-.loading-state {
-  display: flex;
-  justify-content: center;
-  padding: 2rem;
-}
-
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.empty-state {
-  text-align: center;
-  padding: 2rem;
-  color: var(--text-muted);
-  font-size: 0.8rem;
-}
-
-/* API Banner */
-.api-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: var(--radius-lg);
-  padding: 1rem 1.5rem;
-}
-
-.api-banner-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #dc2626;
-  margin-bottom: 0.25rem;
-}
-
-.api-banner-msg {
-  font-size: 0.75rem;
-  color: #b91c1c;
-}
-
-.btn-outline-sm {
-  padding: 0.375rem 0.875rem;
-  border-radius: 6px;
-  border: 1px solid #fecaca;
-  background: white;
-  color: #dc2626;
-  font-size: 0.75rem;
-  cursor: pointer;
-}
-
-.btn-outline-sm:hover {
-  background: #fef2f2;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .dashboard-section {
-    padding: 1rem;
-  }
-  
-  .kpi-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .data-table {
-    display: block;
-    overflow-x: auto;
-  }
-}
 </style>

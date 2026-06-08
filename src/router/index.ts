@@ -16,7 +16,7 @@ const router = createRouter({
       children: [
         {
           path: '',
-          redirect: '/dashboard',
+          redirect: '/login',
         },
         {
           path: 'dashboard',
@@ -32,7 +32,7 @@ const router = createRouter({
         },
         {
           path: 'tickets/create',
-          name: 'ticket-create',
+          name: 'ticket-create-back',
           component: () => import('@/views/back/TicketCreateView.vue'),
           meta: { title: 'Créer un Ticket' },
         },

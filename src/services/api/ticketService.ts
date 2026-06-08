@@ -23,6 +23,139 @@ export interface TicketSearchParams {
   includeDeleted?: boolean;
 }
 
+// ─── Interfaces pour les coûts ─────────────────────────────────────────────────
+
+export interface TicketCost {
+  id: number;
+  tickets_id: number;
+  name: string;
+  comment?: string;
+  actiontime: number;      // Temps passé en secondes
+  cost_time: number;       // Coût horaire
+  cost_fixed: number;      // Coût fixe
+  cost_total: number;      // Coût total
+  date_creation: string;
+  date_mod: string;
+}
+
+export interface TicketCostSummary {
+  totalCost: number;
+  totalTime: number;       // en secondes
+  totalTimeFormatted: string;
+  costTime: number;
+  costFixed: number;
+  costs: TicketCost[];
+}
+
+// ─── Gestion des coûts ────────────────────────────────────────────────────────
+
+/**
+ * Récupère tous les coûts d'un ticket
+ */
+export async function fetchTicketCosts(ticketId: number): Promise<TicketCost[]> {
+  const { default: glpiClient } = await import('./glpiClient');
+  
+  try {
+    const { data } = await glpiClient.get(`${GLPI_ENDPOINTS.TICKET}/${ticketId}/TicketCost`);
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error(`Erreur lors du chargement des coûts du ticket #${ticketId}:`, error);
+    return [];
+  }
+}
+
+/**
+ * Ajoute un coût à un ticket
+ */
+export async function addTicketCost(
+  ticketId: number, 
+  cost: {
+    name: string;
+    comment?: string;
+    actiontime?: number;
+    cost_time?: number;
+    cost_fixed?: number;
+  }
+): Promise<TicketCost | null> {
+  const { default: glpiClient } = await import('./glpiClient');
+  
+  const costTotal = (cost.cost_time || 0) + (cost.cost_fixed || 0);
+  
+  try {
+    const { data } = await glpiClient.post('/TicketCost', {
+      input: {
+        tickets_id: ticketId,
+        name: cost.name,
+        comment: cost.comment || '',
+        actiontime: cost.actiontime || 0,
+        cost_time: cost.cost_time || 0,
+        cost_fixed: cost.cost_fixed || 0,
+        cost_total: costTotal,
+      }
+    });
+    
+    console.log(`[GLPI] Coût ajouté au ticket #${ticketId}:`, data);
+    return data;
+  } catch (error) {
+    console.error(`Erreur lors de l'ajout du coût au ticket #${ticketId}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Supprime un coût d'un ticket
+ */
+export async function deleteTicketCost(costId: number): Promise<boolean> {
+  const { default: glpiClient } = await import('./glpiClient');
+  
+  try {
+    await glpiClient.delete(`/TicketCost/${costId}`);
+    console.log(`[GLPI] Coût #${costId} supprimé`);
+    return true;
+  } catch (error) {
+    console.error(`Erreur lors de la suppression du coût #${costId}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Récupère le résumé des coûts d'un ticket
+ */
+export async function getTicketCostSummary(ticketId: number): Promise<TicketCostSummary> {
+  const costs = await fetchTicketCosts(ticketId);
+  
+  let totalCost = 0;
+  let totalTime = 0;
+  let costTime = 0;
+  let costFixed = 0;
+  
+  costs.forEach(cost => {
+    totalCost += Number(cost.cost_total) || 0;
+    totalTime += Number(cost.actiontime) || 0;
+    costTime += Number(cost.cost_time) || 0;
+    costFixed += Number(cost.cost_fixed) || 0;
+  });
+  
+  // Formater le temps total
+  const hours = Math.floor(totalTime / 3600);
+  const minutes = Math.floor((totalTime % 3600) / 60);
+  let totalTimeFormatted = '0 min';
+  if (hours > 0 && minutes > 0) totalTimeFormatted = `${hours}h ${minutes}min`;
+  else if (hours > 0) totalTimeFormatted = `${hours}h`;
+  else if (minutes > 0) totalTimeFormatted = `${minutes}min`;
+  
+  return {
+    totalCost: Number(totalCost.toFixed(2)),
+    totalTime: totalTime,
+    totalTimeFormatted: totalTimeFormatted,
+    costTime: Number(costTime.toFixed(2)),
+    costFixed: Number(costFixed.toFixed(2)),
+    costs: costs
+  };
+}
+
+// ─── Fonctions existantes ──────────────────────────────────────────────────────
+
 function buildTicketParams(params: TicketSearchParams): Record<string, unknown> {
   const q: Record<string, unknown> = {
     is_deleted: params.includeDeleted ? undefined : 0,
@@ -30,13 +163,9 @@ function buildTicketParams(params: TicketSearchParams): Record<string, unknown> 
   return Object.fromEntries(Object.entries(q).filter(([, v]) => v !== undefined));
 }
 
-// ─── Recherche multicritère des tickets ────────────────────────────────────────
-
 export async function searchTickets(criteria: Array<{ field: string; searchtype: string; value: string }>): Promise<Ticket[]> {
   const { default: glpiClient } = await import('./glpiClient');
   
-  // Construit l'objet param attendu par /search/Ticket
-  // e.g. criteria[0][field]=12 & criteria[0][searchtype]=contains & criteria[0][value]=xyz
   const params: Record<string, string> = {};
   criteria.forEach((c, index) => {
     params[`criteria[${index}][field]`] = c.field;
@@ -44,28 +173,20 @@ export async function searchTickets(criteria: Array<{ field: string; searchtype:
     params[`criteria[${index}][value]`] = c.value;
   });
 
-  // fetchAllPaginated can be used with /search/Ticket
   const raw = await fetchAllPaginated<Record<string, any>>(
     GLPI_ENDPOINTS.SEARCH('Ticket'),
     params
   );
 
-  // Les endpoints de recherche (/search/xxx) renvoient des objets avec les identifiants des champs en clés
-  // Il faut re-mapper cela pour obtenir des Ticket (ou bien utiliser GET /Ticket si possible)
-  // Pour la consistance, ici on retourne un array vide si mapping complexe ou on peut relire via GET /Ticket/{id}
-  // Pour l'instant, faisons un simple re-fetch par ID ou utilisons un format raw minimal
   const tickets: Ticket[] = [];
   for (const item of raw) {
-    if (item[1]) { // field 1 is often ID or name, depends on searchOptions
-      // Idéalement on fetch le ticket complet
+    if (item[1]) {
       const t = await fetchTicketById(Number(item[2] || item.id || Object.values(item)[0]));
       if(t) tickets.push(t);
     }
   }
   return tickets;
 }
-
-// ─── Fetch tous les tickets ───────────────────────────────────────────────────
 
 export async function fetchAllTickets(params: TicketSearchParams = {}): Promise<Ticket[]> {
   const raw = await fetchAllPaginated<GlpiTicket>(
@@ -75,25 +196,17 @@ export async function fetchAllTickets(params: TicketSearchParams = {}): Promise<
   return raw.map(mapGlpiTicketToTicket);
 }
 
-// ─── Fetch un ticket par ID ───────────────────────────────────────────────────
-
 export async function fetchTicketById(id: number): Promise<Ticket> {
   const { default: glpiClient } = await import('./glpiClient');
   const { data } = await glpiClient.get<GlpiTicket>(`${GLPI_ENDPOINTS.TICKET}/${id}`);
   return mapGlpiTicketToTicket(data);
 }
 
-// ─── Fetch les éléments liés à un ticket ──────────────────────────────────────
-
 export async function fetchTicketItems(ticketId: number): Promise<any[]> {
   const { default: glpiClient } = await import('./glpiClient');
-  // GLPI API : GET /Ticket/{id}/Item_Ticket
   const { data } = await glpiClient.get(`${GLPI_ENDPOINTS.TICKET}/${ticketId}/Item_Ticket`);
   return data;
 }
-
-
-// ─── Fetch tickets par statut (raccourcis utiles) ─────────────────────────────
 
 export async function fetchOpenTickets(entityId?: number): Promise<Ticket[]> {
   const tickets = await fetchAllTickets({ entityId });
@@ -115,9 +228,9 @@ export async function fetchClosedTickets(entityId?: number): Promise<Ticket[]> {
 export interface CreateTicketPayload {
   name: string;
   content: string;
-  type?: 1 | 2;         // 1=Incident, 2=Demande
-  priority?: number;    // 1–6
-  urgency?: number;     // 1–6
+  type?: 1 | 2;
+  priority?: number;
+  urgency?: number;
   entitiesId?: number;
   itilcategoriesId?: number;
   usersIdRecipient?: number;
@@ -136,7 +249,7 @@ export async function createTicket(payload: CreateTicketPayload): Promise<{ id: 
       name: payload.name,
       content: payload.content,
       type: payload.type ?? 1,
-      status: 1, // Nouveau
+      status: 1,
       urgency: payload.urgency ?? 3,
       impact: 3,
       priority: payload.priority ?? 3,
@@ -149,11 +262,8 @@ export async function createTicket(payload: CreateTicketPayload): Promise<{ id: 
   return data;
 }
 
-// ─── Associer un élément à un ticket ─────────────────────────────────────────
-
 export async function associateItemToTicket(ticketId: number, itemType: string, itemId: number): Promise<void> {
   const { default: glpiClient } = await import('./glpiClient');
-  // GLPI utilise l'endpoint /Item_Ticket pour lier du matériel à un ticket
   await glpiClient.post('/Item_Ticket', {
     input: {
       tickets_id: ticketId,
@@ -163,31 +273,21 @@ export async function associateItemToTicket(ticketId: number, itemType: string, 
   });
 }
 
-
-// src/services/api/ticketService.ts
-
-// Ajouter à la fin du fichier
-
 // ─── Mettre à jour un ticket ──────────────────────────────────────────────────
 
 export interface UpdateTicketPayload {
   name?: string;
   content?: string;
   type?: 1 | 2;
-  status?: number;      // 1=Nouveau, 2=En cours, 3=Planifié, 4=En attente, 5=Résolu, 6=Fermé
-  priority?: number;    // 1–6
-  urgency?: number;     // 1–6
-  impact?: number;      // 1–6
+  status?: number;
+  priority?: number;
+  urgency?: number;
+  impact?: number;
   itilcategories_id?: number;
   assignedUserId?: number;
   assignedGroupId?: number;
 }
 
-/**
- * Met à jour un ticket existant
- * @param id - ID du ticket
- * @param payload - Champs à modifier
- */
 export async function updateTicket(id: number, payload: UpdateTicketPayload): Promise<{ id: number }> {
   const { default: glpiClient } = await import('./glpiClient');
   
@@ -199,21 +299,10 @@ export async function updateTicket(id: number, payload: UpdateTicketPayload): Pr
   return data;
 }
 
-/**
- * Change le statut d'un ticket
- * @param id - ID du ticket
- * @param status - Nouveau statut (1=Nouveau, 2=En cours, 3=Planifié, 4=En attente, 5=Résolu, 6=Fermé)
- */
 export async function updateTicketStatus(id: number, status: number): Promise<{ id: number }> {
   return updateTicket(id, { status });
 }
 
-/**
- * Ajoute un suivi (followup) à un ticket
- * @param ticketId - ID du ticket
- * @param content - Contenu du suivi
- * @param isPrivate - Si vrai, visible uniquement par les techniciens
- */
 export async function addTicketFollowup(ticketId: number, content: string, isPrivate: boolean = false): Promise<{ id: number }> {
   const { default: glpiClient } = await import('./glpiClient');
   
@@ -231,11 +320,6 @@ export async function addTicketFollowup(ticketId: number, content: string, isPri
   return data;
 }
 
-/**
- * Ajoute une solution à un ticket (résolution)
- * @param ticketId - ID du ticket
- * @param content - Solution apportée
- */
 export async function addTicketSolution(ticketId: number, content: string): Promise<{ id: number }> {
   const { default: glpiClient } = await import('./glpiClient');
   
@@ -249,8 +333,6 @@ export async function addTicketSolution(ticketId: number, content: string): Prom
   });
   
   console.log(`[GLPI] Solution ajoutée au ticket #${ticketId}`);
-  
-  // Optionnel: marquer le ticket comme résolu automatiquement
   await updateTicketStatus(ticketId, 5);
   
   return data;
