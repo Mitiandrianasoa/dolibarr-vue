@@ -82,7 +82,7 @@ const router = createRouter({
          {
           path: 'assets',
           name: 'assets',
-          component: () => import('@/views/AssetsView.vue'),
+          component: () => import('@/views/front/AssetsView.vue'),
           meta: { title: 'Actifs' },
         },
       ]

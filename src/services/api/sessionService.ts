@@ -1,4 +1,5 @@
-import { glpiClient } from './glpiClient';
+// src/services/api/sessionService.ts
+import { glpiClient, initSession, getSessionToken, clearSessionToken } from './glpiClient';
 
 export interface GlpiSession {
   session_token: string;
@@ -15,6 +16,22 @@ export interface GlpiSession {
 
 let activeSession: GlpiSession | null = null;
 
+// Vérifie et initialise la session si nécessaire
+export async function ensureSession(): Promise<string> {
+  let token = getSessionToken();
+  
+  if (!token) {
+    token = await initSession();
+  }
+  
+  // Récupère les infos de session si pas déjà fait
+  if (!activeSession) {
+    await fetchFullSession();
+  }
+  
+  return token;
+}
+
 export async function fetchFullSession(): Promise<GlpiSession> {
   const { data } = await glpiClient.get('/getFullSession');
   activeSession = data.session;
@@ -27,4 +44,5 @@ export function getCurrentSession(): GlpiSession | null {
 
 export function clearCurrentSession() {
   activeSession = null;
+  clearSessionToken();
 }
