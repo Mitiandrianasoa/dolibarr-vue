@@ -14,3 +14,4 @@ BO:
   -  créer la page pour importer les 4 fichiers(4 input files)  
       - 3 fichiers csv pour le contenu    
       - 1 fichier zip pour les images
+ todo-test-fetch
