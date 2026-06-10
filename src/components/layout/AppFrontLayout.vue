@@ -31,6 +31,13 @@
             </svg>
             Éléments
           </router-link>
+          <router-link to="/front/kanban" class="nav-link" active-class="active">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="7" r="4"/>
+              <path d="M5.5 21a8.38 8.38 0 0 1 13 0"/>
+            </svg>
+            Kanban
+          </router-link>
         </nav>
       </div>
 

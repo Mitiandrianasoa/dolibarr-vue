@@ -111,6 +111,12 @@ const router = createRouter({
           component: () => import('@/views/front/AssetsView.vue'),
           meta: { title: 'Actifs' },
         },
+        {
+          path: 'kanban',
+          name: 'front-kanban',
+          component: () => import('@/views/front/KanbanView.vue'),
+          meta: { title: 'Kanban' },
+        },
       ]
     },
     { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
