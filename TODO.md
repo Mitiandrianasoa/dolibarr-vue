@@ -15,5 +15,6 @@ BO:
       - 3 fichiers csv pour le contenu    
       - 1 fichier zip pour les images
  todo-test-fetch
- 2nd pull 
+ 
+ 2nd pull 2
  Test-Mitia

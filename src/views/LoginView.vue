@@ -14,8 +14,8 @@
           </svg>
         </div>
         <div class="login-brand-block">
-          <span class="login-brand-name">DeskFlow</span>
-          <span class="login-brand-tag">ITSM</span>
+          <span class="login-brand-name">GLPI</span>
+          <span class="login-brand-tag">Mitia</span>
         </div>
       </div>
 

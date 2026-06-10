@@ -41,7 +41,8 @@ export const ASSET_TYPE_LABELS: Record<string, string> = {
   'Monitor': 'Écrans',
   'Printer': 'Imprimantes',
   'Phone': 'Téléphones',
-  'NetworkEquipment': 'Réseau'
+  'NetworkEquipment': 'Réseau',
+  'Peripheral': 'Périphériques',
 };
 
 export const TICKET_TYPE_LABELS: Record<number, string> = {

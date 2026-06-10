@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { 
   fetchAllTickets, 
@@ -7,11 +7,16 @@ import {
   fetchTicketCosts,
   getTicketCostSummary,
   addTicketCost,
-  duplicateTicketBatch,
   type TicketCost,
   type TicketCostSummary
 } from '@/services/api/ticketService'
 import type { Ticket, TicketStatus } from '@/models/Ticket'
+
+// ============================================================
+// IMPORTS DES COMPOSANTS MODALS
+// ============================================================
+import TicketDuplicateModal from '@/components/tickets/TicketDuplicateModal.vue'
+import TicketDeleteModal from '@/components/tickets/TicketDeleteModal.vue'
 
 const router = useRouter()
 const loading = ref(false)
@@ -45,21 +50,16 @@ const statuses = [
 ]
 
 // ============================================================
-// VARIABLES POUR LA DUPLICATION
+// VARIABLES POUR LA DUPLICATION ET SUPPRESSION
 // ============================================================
 const selectedTicketIds = ref<Set<number>>(new Set());
 const showDuplicateModal = ref(false);
-const duplicateTimes = ref(1);
+const showDeleteModal = ref(false);
 
-// TOUTES LES OPTIONS (TOUT EST COCHÉ PAR DÉFAUT)
-const duplicateWithItems = ref(true);      // Matériels liés
-const duplicateWithCosts = ref(true);      // Coûts
-const duplicateWithFollowups = ref(true);  // Suivis
-const duplicateWithSolutions = ref(true);  // Solutions
-
-const duplicating = ref(false);
-const duplicateProgress = ref(0);
-const duplicateResults = ref<any[]>([]);
+// Tickets sélectionnés (pour le modal de duplication)
+const selectedTickets = computed(() => {
+  return tickets.value.filter(t => selectedTicketIds.value.has(t.id));
+});
 
 // ============================================================
 // FONCTIONS DE SÉLECTION
@@ -81,48 +81,18 @@ const toggleSelectAll = () => {
 };
 
 // ============================================================
-// LANCER LA DUPLICATION - AVEC TOUS LES PARAMÈTRES
+// GESTIONNAIRES DES MODALS
 // ============================================================
-const startDuplication = async () => {
-  if (selectedTicketIds.value.size === 0) {
-    alert("Veuillez sélectionner au moins un ticket");
-    return;
-  }
-  
-  const ticketsToDuplicate = tickets.value.filter(t => selectedTicketIds.value.has(t.id));
-  
-  duplicating.value = true;
-  duplicateProgress.value = 0;
-  duplicateResults.value = [];
-  
-  try {
-    // APPEL AVEC LES 6 PARAMÈTRES (tickets, times, withItems, withCosts, withFollowups, withSolutions)
-    const result = await duplicateTicketBatch(
-      ticketsToDuplicate,
-      duplicateTimes.value,
-      duplicateWithItems.value,
-      duplicateWithCosts.value,
-      duplicateWithFollowups.value,
-      duplicateWithSolutions.value
-    );
-    
-    duplicateResults.value = result.results;
-    duplicateProgress.value = 100;
-    
-    alert(`✅ ${result.successCount} tickets créés\n❌ ${result.errorCount} erreurs`);
-    
-    await load();
-    selectedTicketIds.value.clear();
-    
-  } catch (error: any) {
-    console.error("Erreur lors de la duplication:", error);
-    alert(`Erreur: ${error.message}`);
-  } finally {
-    duplicating.value = false;
-    setTimeout(() => {
-      showDuplicateModal.value = false;
-    }, 2000);
-  }
+const onDuplicateSuccess = (results: { successCount: number; errorCount: number }) => {
+  console.log(`✅ Duplication: ${results.successCount} succès, ${results.errorCount} erreurs`);
+  load(); // Recharger la liste
+  selectedTicketIds.value.clear(); // Vider la sélection
+};
+
+const onDeleteSuccess = (results: { successCount: number; errorCount: number }) => {
+  console.log(`🗑️ Suppression: ${results.successCount} succès, ${results.errorCount} erreurs`);
+  load(); // Recharger la liste
+  selectedTicketIds.value.clear(); // Vider la sélection
 };
 
 // ============================================================
@@ -287,22 +257,16 @@ onMounted(load)
         <div class="filter-tabs">
           <button v-for="s in statuses" :key="s.key" class="tab" :class="{ active: activeStatus === s.key }" @click="() => { activeStatus = s.key; load(); }">{{ s.label }}</button>
         </div>
-         <!-- BOUTON DELETE -->
-        <button 
-          v-if="selectedTicketIds.size > 0"
-          class="btn-delete-batch" 
-          @click="showDeleteModal = true"
-        >
-           Supprimer ({{ selectedTicketIds.size }})
-        </button>
-        <!-- BOUTON DUPLICATION -->
-        <button 
-          v-if="selectedTicketIds.size > 0"
-          class="btn-duplicate-batch" 
-          @click="showDuplicateModal = true"
-        >
-           Dupliquer ({{ selectedTicketIds.size }})
-        </button>
+        
+        <!-- BOUTONS GROUPÉS (apparaissent quand des tickets sont sélectionnés) -->
+        <div v-if="selectedTicketIds.size > 0" class="batch-actions">
+          <button class="btn-delete-batch" @click="showDeleteModal = true">
+             Supprimer ({{ selectedTicketIds.size }})
+          </button>
+          <button class="btn-duplicate-batch" @click="showDuplicateModal = true">
+             Dupliquer ({{ selectedTicketIds.size }})
+          </button>
+        </div>
         
         <button class="btn-fetch btn-orange" @click="load" :disabled="loading">
           <svg v-if="loading" class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
@@ -461,7 +425,9 @@ onMounted(load)
       </div>
     </div>
 
-    <!-- Modal d'ajout de coût -->
+    <!-- ============================================================ -->
+    <!-- MODAL D'AJOUT DE COÛT -->
+    <!-- ============================================================ -->
     <div v-if="showCostsModal" class="modal-overlay" @click.self="showCostsModal = false">
       <div class="modal-content">
         <div class="modal-header">
@@ -502,120 +468,22 @@ onMounted(load)
     </div>
 
     <!-- ============================================================ -->
-    <!-- MODAL DE DUPLICATION COMPLET AVEC TOUTES LES OPTIONS         -->
+    <!-- MODAL DE DUPLICATION (COMPOSANT) -->
     <!-- ============================================================ -->
-    <div v-if="showDuplicateModal" class="modal-overlay" @click.self="showDuplicateModal = false">
-      <div class="modal-content-duplicate">
-        <div class="modal-header">
-          <h3>Dupliquer {{ selectedTicketIds.size }} ticket(s)</h3>
-          <button class="modal-close" @click="showDuplicateModal = false">×</button>
-        </div>
-        
-        <div class="modal-body">
-          <!-- Liste des tickets sélectionnés -->
-          <div class="selected-list">
-            <strong>Tickets sélectionnés :</strong>
-            <div class="selected-tags">
-              <span v-for="id in Array.from(selectedTicketIds).slice(0, 10)" :key="id" class="tag">
-                #{{ id }}
-              </span>
-              <span v-if="selectedTicketIds.size > 10" class="tag">
-                +{{ selectedTicketIds.size - 10 }} autres
-              </span>
-            </div>
-          </div>
-          
-          <!-- Nombre de copies (RADIOS) -->
-          <div class="form-group">
-            <label>Nombre de copies par ticket :</label>
-            <div class="radio-group">
-              <label v-for="n in [1,2,3,5,10]" :key="n">
-                <input type="radio" :value="n" v-model="duplicateTimes" />
-                {{ n }} fois
-              </label>
-              <label>
-                <input type="radio" value="custom" v-model="duplicateTimes" />
-                <input 
-                  type="number" 
-                  v-model.number="duplicateTimes" 
-                  min="1" 
-                  max="20"
-                  style="width: 70px; margin-left: 8px;"
-                  placeholder="Nb"
-                />
-              </label>
-            </div>
-          </div>
-          
-          <!-- OPTIONS DE DUPLICATION (CHECKBOX) -->
-          <div class="form-group">
-            <label> Éléments à dupliquer :</label>
-            <div class="checkbox-group">
-              <label>
-                <input type="checkbox" v-model="duplicateWithItems" />
-                 Matériels liés
-              </label>
-              <label>
-                <input type="checkbox" v-model="duplicateWithCosts" />
-                 Coûts
-              </label>
-              <label>
-                <input type="checkbox" v-model="duplicateWithFollowups" />
-                 Suivis
-              </label>
-              <label>
-                <input type="checkbox" v-model="duplicateWithSolutions" />
-                Solutions
-              </label>
-            </div>
-            <small>Cochez les éléments que vous souhaitez dupliquer</small>
-          </div>
-          
-          <!-- Barre de progression -->
-          <div v-if="duplicating" class="progress-area">
-            <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: duplicateProgress + '%' }"></div>
-            </div>
-            <div class="progress-text">{{ duplicateProgress }}%</div>
-          </div>
-          
-          <!-- Résultats détaillés -->
-          <div v-if="duplicateResults.length > 0 && !duplicating" class="results-area">
-            <h4>Résultats de la duplication :</h4>
-            <div class="results-scroll">
-              <div v-for="result in duplicateResults" :key="result.originalId" class="result-group">
-                <div class="result-header">
-                  <strong>Ticket #{{ result.originalId }}</strong> - {{ result.originalTitle.substring(0, 40) }}...
-                </div>
-                <div class="copies-list">
-                  <span 
-                    v-for="copy in result.copies" 
-                    :key="copy.copyNumber" 
-                    class="copy-status"
-                    :class="copy.newId ? 'success' : 'error'"
-                  >
-                    {{ copy.newId ? `✓ #${copy.newId}` : `✗ ${copy.error?.substring(0, 20)}` }}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div class="summary-stats">
-               Succès: {{ duplicateResults.reduce((acc, r) => acc + r.copies.filter((c: any) => c.newId).length, 0) }} / 
-              {{ duplicateResults.reduce((acc, r) => acc + r.copies.length, 0) }}
-            </div>
-          </div>
-        </div>
-        
-        <div class="modal-footer">
-          <button class="btn-secondary" @click="showDuplicateModal = false" :disabled="duplicating">
-            Annuler
-          </button>
-          <button class="btn-primary" @click="startDuplication" :disabled="duplicating">
-            {{ duplicating ? 'Duplication en cours...' : `🚀 Dupliquer (${selectedTicketIds.size} × ${duplicateTimes})` }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <TicketDuplicateModal 
+      v-model:visible="showDuplicateModal"
+      :selected-tickets="selectedTickets"
+      @success="onDuplicateSuccess"
+    />
+
+    <!-- ============================================================ -->
+    <!-- MODAL DE SUPPRESSION (COMPOSANT) -->
+    <!-- ============================================================ -->
+    <TicketDeleteModal 
+      v-model:visible="showDeleteModal"
+      :selected-ticket-ids="Array.from(selectedTicketIds)"
+      @success="onDeleteSuccess"
+    />
   </div>
 </template>
 
@@ -624,6 +492,4 @@ onMounted(load)
 /* STYLES DE BASE IMPORTÉS DEPUIS TicketsView.css */
 /* ============================================================ */
 @import '@/styles/TicketsView.css';
-
-
 </style>

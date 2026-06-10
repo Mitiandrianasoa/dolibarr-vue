@@ -13,8 +13,8 @@
       </div>
       <Transition name="label">
         <div v-if="!collapsed" class="brand-text">
-          <span class="brand-name">DeskFlow</span>
-          <span class="brand-tag">ITSM</span>
+          <span class="brand-name">GLPI</span>
+          <span class="brand-tag"></span>
         </div>
       </Transition>
     </div>
