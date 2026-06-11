@@ -22,6 +22,7 @@ const itemtypesToDelete = [
   'Budget',
   //Documents
   'Document',
+  'Rack',
 ];
 
 const resetDatabase = async () => {

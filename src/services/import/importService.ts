@@ -87,7 +87,8 @@ export const ITEM_TYPE_MAP: Record<string, string> = {
 
 const TICKET_STATUS_MAP: Record<string, number> = {
   'New':      1,
-  'Assigned': 2,
+  // 'Assigned': 2,
+  'In progress': 2,
   'Planned':  3,
   'Pending':  4,
   'Solved':   5,

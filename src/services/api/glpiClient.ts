@@ -46,7 +46,7 @@ export function clearSessionToken(): void {
 
 export const glpiClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
-  timeout: 15_000,
+  timeout: 120_000,
   headers: {
     'Content-Type': 'application/json',
     'App-Token': APP_TOKEN,
