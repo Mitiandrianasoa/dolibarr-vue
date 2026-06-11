@@ -607,14 +607,18 @@ async function importTickets(
     try {
       const datetime  = parseGlpiDateTime(row.Date, row.Heure)
       const itemNames = parseItemsList(row.Items)
+      const finalStatus = TICKET_STATUS_MAP[row.Status] ?? 1  // Statut final souhaité (ex: Closed = 6)
+      const initialStatus = 1  // Toujours "New" à la création
 
       addLog('debug', `[Tickets] L.${lineNumber} — datetime="${datetime}", items=${JSON.stringify(itemNames)}`, lineNumber)
+      addLog('debug', `[Tickets] L.${lineNumber} — Statut initial: ${initialStatus} (New), statut final: ${finalStatus}`, lineNumber)
 
+      // ÉTAPE 1 : Créer le ticket avec le statut "New" (1)
       const ticketPayload = {
         name:        row.Titre,
         content:     row.Description || row.Titre,
         type:        TICKET_TYPE_MAP[row.Type]        ?? 1,
-        status:      TICKET_STATUS_MAP[row.Status]     ?? 1,
+        status:      initialStatus,  // ← FORCÉ à 1 (New)
         priority:    TICKET_PRIORITY_MAP[row.Priority] ?? 3,
         urgency:     3,
         impact:      3,
@@ -623,14 +627,14 @@ async function importTickets(
         entities_id: 0,
       }
 
-      addLog('debug', `[Tickets] L.${lineNumber} — Payload: ${JSON.stringify(ticketPayload)}`, lineNumber)
+      addLog('debug', `[Tickets] L.${lineNumber} — Création ticket avec payload: ${JSON.stringify(ticketPayload)}`, lineNumber)
       const { data } = await glpiClient.post<{ id: number }>('/Ticket', { input: ticketPayload })
       const ticketId = data.id
       refToGlpiId.set(ref, ticketId)
-      addLog('success', `[Tickets] L.${lineNumber} — Ref#${ref} "${row.Titre}" créé (ID=${ticketId})`, lineNumber)
+      addLog('success', `[Tickets] L.${lineNumber} — Ref#${ref} "${row.Titre}" créé (ID=${ticketId}, statut: New)`, lineNumber)
       stats.created++
 
-      // Lier les assets au ticket
+      // ÉTAPE 2 : Lier les assets au ticket (possible car ticket est en statut New)
       for (const assetName of itemNames) {
         let assetRef = nameToIdCache.get(assetName)
         if (!assetRef) assetRef = await findAssetByName(assetName, nameToIdCache, logDebug) ?? undefined
@@ -648,6 +652,22 @@ async function importTickets(
           addLog('warning', `[Tickets] L.${lineNumber} — Lien "${assetName}" impossible: ${err.message}`, lineNumber, 'Items')
         }
       }
+
+      // ÉTAPE 3 : Appliquer le statut final (ex: Closed = 6) seulement si différent du statut initial
+      if (finalStatus !== initialStatus) {
+        addLog('debug', `[Tickets] L.${lineNumber} — Mise à jour du statut vers ${finalStatus}...`, lineNumber)
+        try {
+          await glpiClient.put(`/Ticket/${ticketId}`, {
+            input: { status: finalStatus }
+          })
+          addLog('success', `[Tickets] L.${lineNumber} — Ticket#${ticketId} mis à jour (statut: ${finalStatus})`, lineNumber)
+        } catch (e: unknown) {
+          const err = e as { message?: string; response?: { data?: unknown } }
+          addLog('warning', `[Tickets] L.${lineNumber} — Mise à jour du statut impossible: ${err.message}`, lineNumber, undefined, err.response?.data)
+          // Note: Le ticket a quand même été créé avec les liens, seul le statut final n'a pas été appliqué
+        }
+      }
+
     } catch (e: unknown) {
       const err = e as { message?: string; response?: { data?: unknown } }
       addLog('error', `[Tickets] L.${lineNumber} — Erreur Ref#${ref}: ${err.message}`, lineNumber, undefined, err.response?.data)

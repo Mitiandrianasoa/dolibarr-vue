@@ -49,31 +49,12 @@ const router = createRouter({
           component: () => import('@/views/back/AssetsView.vue'),
           meta: { title: 'Actifs' },
         },
-        // Ajoutez cette route
-        // {
-        //   path: '/sync',
-        //   name: 'Sync',
-        //   component: () => import('@/views/back/SyncView.vue'),
-        //   meta: { title: 'Synchronisation GLPI ET SQLite' }
-        // },
-        // {
-        //   path: 'users',
-        //   name: 'users',
-        //   component: () => import('@/views/UsersView.vue'),
-        //   meta: { title: 'Utilisateurs' },
-        // },
-        // {
-        //   path: 'entities',
-        //   name: 'entities',
-        //   component: () => import('@/views/EntitiesView.vue'),
-        //   meta: { title: 'Entités' },
-        // },
-        // {
-        //   path: 'locations',
-        //   name: 'locations',
-        //   component: () => import('@/views/LocationsView.vue'),
-        //   meta: { title: 'Localisations' },
-        // },
+        {
+          path: 'kanban-settings',
+          name: 'kanban-settings',
+          component: () => import('@/views/back/KanbanSettingsView.vue'),
+          meta: { title: 'Paramètres Kanban' },
+        },
         {
           path: 'reset',
           name: 'reset',
