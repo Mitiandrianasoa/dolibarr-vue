@@ -11,6 +11,13 @@ const loading = ref(true)
 const loadError = ref('')
 const allTickets = ref<Ticket[]>([])
 
+// ── Langue ─────────────────────────────────────────────────────
+const currentLang = ref<'fr' | 'mg'>('fr')  // 'fr' = français, 'mg' = malgache
+
+function toggleLanguage() {
+  currentLang.value = currentLang.value === 'fr' ? 'mg' : 'fr'
+}
+
 // ── Paramètres Kanban (couleurs + labels malgaches) ─────────
 const colSettings = ref<Record<string, KanbanSetting>>({})
 
@@ -27,8 +34,31 @@ function colColor(colId: string): string {
   return colSettings.value[colId]?.color ?? ''
 }
 
+function colLabelFr(colId: string): string {
+  // Retourne le label français selon l'ID de colonne
+  const labels: Record<string, string> = {
+    'new': 'Nouveau',
+    'progress': 'En cours',
+    'done': 'Terminé',
+  }
+  return labels[colId] ?? colId
+}
+
 function colLabelMg(colId: string): string {
-  return colSettings.value[colId]?.labelMg ?? ''
+  // Retourne le label malgache depuis les settings ou fallback
+  const fallback: Record<string, string> = {
+    'new': 'Vaovao',
+    'progress': 'Efa manao',
+    'done': 'Vita',
+  }
+  return colSettings.value[colId]?.labelMg ?? fallback[colId] ?? colId
+}
+
+function getColumnLabel(col: typeof COLUMNS[number]): string {
+  if (currentLang.value === 'mg') {
+    return colLabelMg(col.id)
+  }
+  return col.label  // label français par défaut
 }
 
 // ── Colonnes Kanban ─────────────────────────────────────────────
@@ -55,7 +85,7 @@ const COLUMNS = [
     statuses: [5, 6] as number[],
     targetStatus: 5,
     defaultColor: '#dcfce7',
-    needsDialog: true,   // Demande une note de résolution
+    needsDialog: true,
   },
 ] as const
 
@@ -125,7 +155,6 @@ async function applyStatusChange(ticket: Ticket, newStatus: number, note?: strin
   const idx = allTickets.value.findIndex(t => t.id === ticket.id)
   const prev = idx !== -1 ? { ...allTickets.value[idx] } : null
 
-  // Mise à jour optimiste
   if (idx !== -1) {
     allTickets.value[idx] = { ...allTickets.value[idx], status: newStatus as TicketStatus }
   }
@@ -133,20 +162,18 @@ async function applyStatusChange(ticket: Ticket, newStatus: number, note?: strin
   try {
     await glpiClient.put(`/Ticket/${ticket.id}`, { input: { status: newStatus } })
 
-    // Si note de résolution → ITILSolution
     if (note?.trim()) {
       await glpiClient.post('/ITILSolution', {
         input: { items_id: ticket.id, itemtype: 'Ticket', content: note.trim() },
-      }).catch(() => { /* silencieux si refusé */ })
+      }).catch(() => {})
     }
   } catch (e) {
-    // Rollback
     if (prev && idx !== -1) allTickets.value[idx] = prev
     console.error('Erreur mise à jour statut :', e)
   }
 }
 
-// ── Dialog de confirmation (Terminé) ────────────────────────────
+// ── Dialog de confirmation ──────────────────────────────────────
 const showDialog    = ref(false)
 const dialogTicket  = ref<Ticket | null>(null)
 const dialogStatus  = ref(5)
@@ -197,7 +224,7 @@ const TYPE_META: Record<number, { label: string; color: string }> = {
 const PRIORITY_META: Record<number, { label: string; color: string }> = {
   1: { label: 'Très basse', color: 'gray'   },
   2: { label: 'Basse',      color: 'green'  },
-  3: { label: 'Medium',    color: 'yellow' },
+  3: { label: 'Medium',     color: 'yellow' },
   4: { label: 'Haute',      color: 'orange' },
   5: { label: 'Très haute', color: 'red'    },
   6: { label: 'Majeure',    color: 'red'    },
@@ -213,7 +240,7 @@ const STATUS_META: Record<number, { label: string; color: string }> = {
 }
 
 function typeMeta(t: number)     { return TYPE_META[t]     ?? { label: 'Inconnu', color: 'gray' } }
-function priorityMeta(p: number) { return PRIORITY_META[p] ?? { label: '-',       color: 'gray' } }
+function priorityMeta(p: number) { return PRIORITY_META[p] ?? { label: '-', color: 'gray' } }
 function statusMeta(s: number)   { return STATUS_META[s]   ?? { label: 'Inconnu', color: 'gray' } }
 
 function relativeDate(d?: string) {
@@ -255,6 +282,24 @@ onMounted(() => { load(); loadSettings() })
         </div>
       </div>
       <div class="mv-actions">
+        <!-- Sélecteur de langue -->
+        <div class="lang-switcher">
+          <button 
+            class="lang-btn" 
+            :class="{ active: currentLang === 'fr' }"
+            @click="currentLang = 'fr'"
+          >
+            🇫🇷 FR
+          </button>
+          <button 
+            class="lang-btn" 
+            :class="{ active: currentLang === 'mg' }"
+            @click="currentLang = 'mg'"
+          >
+            🇲🇬 MG
+          </button>
+        </div>
+        
         <button class="btn-fetch" @click="load" :disabled="loading">
           <svg v-if="loading" class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <path d="M21 12a9 9 0 1 1-6.219-8.56" />
@@ -298,8 +343,8 @@ onMounted(() => { load(); loadSettings() })
         <div class="col-header">
           <div class="col-title-wrap">
             <div class="col-title-stack">
-              <span class="col-title">{{ col.label }}</span>
-              <span v-if="colLabelMg(col.id)" class="col-title-mg">{{ colLabelMg(col.id) }}</span>
+              <!-- Titre principal qui change selon la langue -->
+              <span class="col-title">{{ getColumnLabel(col) }}</span>
             </div>
           </div>
           <span class="col-count">{{ colTickets(col).length }}</span>
@@ -350,7 +395,7 @@ onMounted(() => { load(); loadSettings() })
             </div>
 
             <div v-if="colTickets(col).length === 0" class="col-empty">
-              Aucun ticket
+              {{ currentLang === 'mg' ? 'Tsy misy ticket' : 'Aucun ticket' }}
             </div>
           </template>
         </div>
@@ -363,16 +408,17 @@ onMounted(() => { load(); loadSettings() })
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
           </svg>
-          Ajouter un ticket
+          {{ currentLang === 'mg' ? 'Hanampy ticket' : 'Ajouter un ticket' }}
         </button>
       </div>
     </div>
 
-    <!-- MODAL DÉTAIL TICKET -->
+    <!-- MODAL DÉTAIL TICKET (inchangé) -->
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="selectedTicket" class="modal-overlay" @click.self="closeDetail">
           <div class="modal-card">
+            <!-- Contenu inchangé -->
             <div class="modal-head">
               <div class="modal-chips">
                 <span class="badge" :class="`badge-${typeMeta(selectedTicket.type).color}`">
@@ -390,27 +436,27 @@ onMounted(() => { load(); loadSettings() })
 
             <div class="modal-meta">
               <div class="meta-item">
-                <span class="meta-label">Créé</span>
+                <span class="meta-label">{{ currentLang === 'mg' ? 'Namorona' : 'Créé' }}</span>
                 <span class="meta-val">{{ formatFull(selectedTicket.createdAt) }}</span>
               </div>
               <div class="meta-item">
-                <span class="meta-label">Priorité</span>
+                <span class="meta-label">{{ currentLang === 'mg' ? 'Laharam-pahamehana' : 'Priorité' }}</span>
                 <span class="meta-val">{{ priorityMeta(selectedTicket.priority ?? 3).label }}</span>
               </div>
               <div class="meta-item" v-if="selectedTicket.solvedAt">
-                <span class="meta-label">Résolu</span>
+                <span class="meta-label">{{ currentLang === 'mg' ? 'Voavaha' : 'Résolu' }}</span>
                 <span class="meta-val">{{ formatFull(selectedTicket.solvedAt) }}</span>
               </div>
             </div>
 
             <div v-if="selectedTicket.description" class="modal-section">
-              <p class="section-label">Description</p>
+              <p class="section-label">{{ currentLang === 'mg' ? 'Famaritana' : 'Description' }}</p>
               <div class="description-box" v-html="selectedTicket.description"></div>
             </div>
 
             <div v-if="loadingItems || linkedItems.length" class="modal-section">
-              <p class="section-label">Matériels liés</p>
-              <div v-if="loadingItems" class="items-loading">Chargement…</div>
+              <p class="section-label">{{ currentLang === 'mg' ? 'Fitaovana mifandraika' : 'Matériels liés' }}</p>
+              <div v-if="loadingItems" class="items-loading">{{ currentLang === 'mg' ? 'Fandefasana...' : 'Chargement…' }}</div>
               <div v-else class="linked-items">
                 <span v-for="item in linkedItems" :key="item.id" class="item-chip">
                   {{ item.itemtype }} #{{ item.items_id }}
@@ -419,9 +465,9 @@ onMounted(() => { load(); loadSettings() })
             </div>
 
             <div class="modal-foot">
-              <button class="btn-secondary" @click="closeDetail">Fermer</button>
+              <button class="btn-secondary" @click="closeDetail">{{ currentLang === 'mg' ? 'Hidiana' : 'Fermer' }}</button>
               <button class="btn-primary" @click="closeDetail(); router.push(`/tickets/${selectedTicket!.id}/edit`)">
-                Modifier
+                {{ currentLang === 'mg' ? 'Hanova' : 'Modifier' }}
               </button>
             </div>
           </div>
@@ -429,7 +475,7 @@ onMounted(() => { load(); loadSettings() })
       </Transition>
     </Teleport>
 
-    <!-- DIALOG CONFIRMATION STATUT "TERMINÉ" -->
+    <!-- DIALOG CONFIRMATION (inchangé) -->
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="showDialog" class="modal-overlay" @click.self="cancelDialog">
@@ -441,25 +487,26 @@ onMounted(() => { load(); loadSettings() })
               </svg>
             </div>
 
-            <h3 class="dialog-title">Marquer comme terminé ?</h3>
+            <h3 class="dialog-title">{{ currentLang === 'mg' ? 'Hamarino ho vita ?' : 'Marquer comme terminé ?' }}</h3>
             <p class="dialog-sub">
-              Le ticket <strong>#{{ dialogTicket?.id }}</strong> sera marqué comme résolu.
-              Vous pouvez ajouter une note de résolution (optionnel).
+              {{ currentLang === 'mg' ? 'Ny ticket' : 'Le ticket' }} <strong>#{{ dialogTicket?.id }}</strong> 
+              {{ currentLang === 'mg' ? 'dia hatao vita.' : 'sera marqué comme résolu.' }}
+              {{ currentLang === 'mg' ? 'Azonao atao ny manoratra fanazavana (tsy voatery).' : 'Vous pouvez ajouter une note de résolution (optionnel).' }}
             </p>
 
             <div class="dialog-field">
-              <label>Note de résolution</label>
+              <label>{{ currentLang === 'mg' ? 'Fanazavana' : 'Note de résolution' }}</label>
               <textarea
                 v-model="resolutionNote"
                 rows="3"
-                placeholder="Décrivez la solution apportée…"
+                :placeholder="currentLang === 'mg' ? 'Soraty ny vahaolana...' : 'Décrivez la solution apportée…'"
               ></textarea>
             </div>
 
             <div class="dialog-actions">
-              <button class="btn-secondary" @click="cancelDialog">Annuler</button>
+              <button class="btn-secondary" @click="cancelDialog">{{ currentLang === 'mg' ? 'Aoka' : 'Annuler' }}</button>
               <button class="btn-primary" @click="confirmDialog">
-                Confirmer
+                {{ currentLang === 'mg' ? 'Hamafy' : 'Confirmer' }}
               </button>
             </div>
           </div>
@@ -471,4 +518,37 @@ onMounted(() => { load(); loadSettings() })
 
 <style scoped>
 @import '../../styles/KanbanView.css';
+
+/* ============================================
+   SELECTEUR DE LANGUE
+   ============================================ */
+.lang-switcher {
+  display: flex;
+  gap: 0.25rem;
+  background: #f1f5f9;
+  padding: 0.25rem;
+  border-radius: 10px;
+}
+
+.lang-btn {
+  padding: 0.375rem 0.875rem;
+  border: none;
+  background: transparent;
+  border-radius: 7px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #475569;
+}
+
+.lang-btn.active {
+  background: white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  color: #3b82f6;
+}
+
+.lang-btn:hover:not(.active) {
+  background: #e2e8f0;
+}
 </style>
