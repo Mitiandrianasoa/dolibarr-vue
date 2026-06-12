@@ -571,3 +571,42 @@ export async function deleteTicket(
     results
   };
 }
+
+// Ajouter dans ticketService.ts
+
+// /**
+//  * Récupère les suivis d'un ticket
+//  */
+// export async function fetchTicketFollowups(ticketId: number): Promise<any[]> {
+//   const { default: glpiClient } = await import('./glpiClient');
+//   try {
+//     const { data } = await glpiClient.get(`/Ticket/${ticketId}/ITILFollowup`);
+//     return Array.isArray(data) ? data : [];
+//   } catch (error) {
+//     console.error(`Erreur chargement suivis ticket #${ticketId}:`, error);
+//     return [];
+//   }
+// }
+
+/**
+ * Supprime un suivi
+ */
+export async function deleteTicketFollowup(followupId: number): Promise<void> {
+  const { default: glpiClient } = await import('./glpiClient');
+  await glpiClient.delete(`/ITILFollowup/${followupId}`);
+}
+
+/**
+ * Dissocie un élément d'un ticket
+ */
+export async function dissociateItemFromTicket(ticketId: number, itemtype: string, itemId: number): Promise<void> {
+  const { default: glpiClient } = await import('./glpiClient');
+  
+  // Chercher l'ID de l'association
+  const { data } = await glpiClient.get(`/Ticket/${ticketId}/Item_Ticket`);
+  const association = data.find((a: any) => a.itemtype === itemtype && a.items_id === itemId);
+  
+  if (association) {
+    await glpiClient.delete(`/Item_Ticket/${association.id}`);
+  }
+}
