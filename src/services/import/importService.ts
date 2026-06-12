@@ -893,146 +893,310 @@ export const importService = {
    * resetDatabase() est appelé automatiquement et success=false est retourné.
    */
   async runFullImport(
-    sheet1: File,
-    sheet2: File,
-    sheet3: File,
-    photosZip?: File | null,
-    onProgress?: (pct: number, step: string) => void
-  ): Promise<ImportResult> {
-    const logs: ImportLogEntry[] = []
-    const progress = (pct: number, step: string) => onProgress?.(pct, step)
-    const log = (level: ImportLogEntry['level'], msg: string) =>
-      logs.push({ level, message: msg, timestamp: new Date().toISOString() })
+  sheet1: File | null,
+  sheet2: File | null,
+  sheet3: File | null,
+  photosZip?: File | null,
+  onProgress?: (pct: number, step: string) => void
+): Promise<ImportResult> {
+  const logs: ImportLogEntry[] = []
+  const progress = (pct: number, step: string) => onProgress?.(pct, step)
+  const log = (level: ImportLogEntry['level'], msg: string) =>
+    logs.push({ level, message: msg, timestamp: new Date().toISOString() })
 
-    const nameToIdCache = new Map<string, { itemtype: string; id: number }>()
-    const refToGlpiId   = new Map<string, number>()
-    const userStats     = { total: 0, created: 0, errors: 0 }
+  console.log('[ImportService] 🚀 Début runFullImport', {
+    hasAssets: !!sheet1,
+    hasTickets: !!sheet2,
+    hasCosts: !!sheet3,
+    hasPhotos: !!photosZip,
+    timestamp: new Date().toISOString()
+  })
 
-    log('info', '════════════════════════════════════')
-    log('info', `  Début import — ${new Date().toLocaleString('fr-FR')}`)
-    log('info', '════════════════════════════════════')
-    progress(0, 'Lecture des fichiers CSV...')
+  const nameToIdCache = new Map<string, { itemtype: string; id: number }>()
+  const refToGlpiId   = new Map<string, number>()
+  const userStats     = { total: 0, created: 0, errors: 0 }
 
-    // ── Lecture fichiers ──
-    const [csv1, csv2, csv3] = await Promise.all([
-      readFileAsText(sheet1),
-      readFileAsText(sheet2),
-      readFileAsText(sheet3),
-    ])
-    const assetsRows  = parseCSV(csv1)  as unknown as AssetRow[]
-    const ticketsRows = parseCSV(csv2)  as unknown as TicketRow[]
-    const costsRows   = parseCSV(csv3)  as unknown as CostRow[]
+  log('info', '════════════════════════════════════')
+  log('info', `  Début import — ${new Date().toLocaleString('fr-FR')}`)
+  log('info', '════════════════════════════════════')
+  progress(0, 'Préparation de l\'import...')
 
-    log('info', `Feuille 1 (Actifs)  : ${assetsRows.length} ligne(s)`)
-    log('info', `Feuille 2 (Tickets) : ${ticketsRows.length} ligne(s)`)
-    log('info', `Feuille 3 (Coûts)   : ${costsRows.length} ligne(s)`)
+  let assetsRows: AssetRow[] = []
+  let ticketsRows: TicketRow[] = []
+  let costsRows: CostRow[] = []
 
-    // ── Validation préalable ──
-    log('info', '─── Validation des CSV ───')
-    const preValidErrors = [
-      ...validateAssetsCsv(assetsRows).map(e => ({ ...e, sheet: 'Actifs' })),
-      ...validateTicketsCsv(ticketsRows).map(e => ({ ...e, sheet: 'Tickets' })),
-      ...validateCostsCsv(costsRows).map(e => ({ ...e, sheet: 'Coûts' })),
-    ]
-    if (preValidErrors.length > 0) {
-      for (const e of preValidErrors) {
-        logs.push({
-          level: 'error',
-          message: `[Validation ${e.sheet}] L.${e.lineNumber} — Champ "${e.field}" invalide (valeur: "${e.value}"): ${e.reason}`,
-          timestamp: new Date().toISOString(),
-          lineNumber: e.lineNumber,
-          field: e.field,
-        })
+  // ── Lecture des fichiers CSV (uniquement s'ils existent) ──
+  
+  // Feuille 1 : Assets
+  if (sheet1) {
+    log('info', '📄 Lecture du fichier Actifs...')
+    try {
+      const csv1 = await readFileAsText(sheet1)
+      assetsRows = parseCSV(csv1) as unknown as AssetRow[]
+      
+      // Vérifier si le fichier est vide ou ne contient que l'en-tête
+      if (assetsRows.length === 0) {
+        log('warning', '⚠️ Fichier Actifs : aucune ligne de données (seulement l\'en-tête ou fichier vide)')
+      } else {
+        log('success', `✅ Fichier Actifs : ${assetsRows.length} ligne(s) de données`)
       }
-      log('error', `Validation échouée — ${preValidErrors.length} erreur(s) détectée(s). Import annulé.`)
-      return {
-        success: false,
-        logs,
-        stats: {
-          assets:  { total: assetsRows.length,  created: 0, skipped: 0, errors: preValidErrors.length },
-          tickets: { total: ticketsRows.length, created: 0, skipped: 0, errors: 0 },
-          costs:   { total: costsRows.length,   created: 0, errors: 0 },
-          photos:  { total: 0, uploaded: 0, errors: 0 },
-          users:   userStats,
-        },
+      console.log(`[ImportService] Assets: ${assetsRows.length} lignes parsées`)
+    } catch (e: any) {
+      log('error', `❌ Erreur lecture fichier Actifs : ${e.message}`)
+      console.error('[ImportService] Erreur lecture Assets:', e)
+    }
+  } else {
+    log('info', '📄 Fichier Actifs : non fourni')
+  }
+
+  // Feuille 2 : Tickets
+  if (sheet2) {
+    log('info', '📄 Lecture du fichier Tickets...')
+    try {
+      const csv2 = await readFileAsText(sheet2)
+      ticketsRows = parseCSV(csv2) as unknown as TicketRow[]
+      
+      if (ticketsRows.length === 0) {
+        log('warning', '⚠️ Fichier Tickets : aucune ligne de données (seulement l\'en-tête ou fichier vide)')
+      } else {
+        log('success', `✅ Fichier Tickets : ${ticketsRows.length} ligne(s) de données`)
       }
+      console.log(`[ImportService] Tickets: ${ticketsRows.length} lignes parsées`)
+    } catch (e: any) {
+      log('error', `❌ Erreur lecture fichier Tickets : ${e.message}`)
+      console.error('[ImportService] Erreur lecture Tickets:', e)
     }
-    log('success', 'Validation CSV réussie — aucune erreur de format')
+  } else {
+    log('info', '📄 Fichier Tickets : non fourni')
+  }
 
-    // ── Import assets ──
-    progress(10, 'Import des actifs...')
-    log('info', '─── Import Actifs ───')
-    const assetsStats = await importAssets(assetsRows, logs, nameToIdCache, userStats)
-
-    // ── Import tickets ──
-    progress(50, 'Import des tickets...')
-    log('info', '─── Import Tickets ───')
-    const ticketsStats = await importTickets(ticketsRows, logs, nameToIdCache, refToGlpiId)
-
-    // ── Import coûts ──
-    progress(75, 'Import des coûts...')
-    log('info', '─── Import Coûts ───')
-    const costsStats = await importCosts(costsRows, logs, refToGlpiId)
-
-    // ── Import photos ──
-    let photosStats = { total: 0, uploaded: 0, errors: 0 }
-    if (photosZip) {
-      progress(85, 'Upload des photos...')
-      log('info', '─── Import Photos ───')
-      photosStats = await importPhotos(photosZip, logs, nameToIdCache)
-    }
-
-    progress(95, 'Vérification des résultats...')
-
-    const hasErrors =
-      assetsStats.errors > 0  ||
-      ticketsStats.errors > 0 ||
-      costsStats.errors > 0   ||
-      photosStats.errors > 0  ||
-      userStats.errors > 0
-
-    if (hasErrors) {
-      log('error', '════════ ERREURS DÉTECTÉES — RESET EN COURS ════════')
-      log('error', `  Actifs: ${assetsStats.errors} erreur(s)`)
-      log('error', `  Tickets: ${ticketsStats.errors} erreur(s)`)
-      log('error', `  Coûts: ${costsStats.errors} erreur(s)`)
-      log('error', `  Photos: ${photosStats.errors} erreur(s)`)
-      log('error', `  Utilisateurs: ${userStats.errors} erreur(s)`)
-      log('error', 'Rollback automatique : suppression de toutes les données importées...')
-      try {
-        const resetResults = await resetService.resetDatabase()
-        for (const r of resetResults) {
-          if (r.success) {
-            log('info', `[Reset] ${r.itemtype} — ${r.message ?? 'purgé'}`)
-          } else {
-            log('warning', `[Reset] ${r.itemtype} — échec purge: ${JSON.stringify(r.error)}`)
-          }
-        }
-        log('info', 'Reset terminé. Base revenue à son état initial.')
-      } catch (resetErr: unknown) {
-        const err = resetErr as { message?: string }
-        log('error', `[Reset] Erreur critique lors du reset : ${err.message}`)
+  // Feuille 3 : Coûts
+  if (sheet3) {
+    log('info', '📄 Lecture du fichier Coûts...')
+    try {
+      const csv3 = await readFileAsText(sheet3)
+      costsRows = parseCSV(csv3) as unknown as CostRow[]
+      
+      if (costsRows.length === 0) {
+        log('warning', '⚠️ Fichier Coûts : aucune ligne de données (seulement l\'en-tête ou fichier vide)')
+      } else {
+        log('success', `✅ Fichier Coûts : ${costsRows.length} ligne(s) de données`)
       }
-    } else {
-      log('success', '════════════════════════════════════')
-      log('success', `  Import terminé avec succès — ${userStats.created} utilisateur(s) créé(s)`)
-      log('success', '════════════════════════════════════')
+      console.log(`[ImportService] Costs: ${costsRows.length} lignes parsées`)
+    } catch (e: any) {
+      log('error', `❌ Erreur lecture fichier Coûts : ${e.message}`)
+      console.error('[ImportService] Erreur lecture Costs:', e)
     }
+  } else {
+    log('info', '📄 Fichier Coûts : non fourni')
+  }
 
-    progress(100, hasErrors ? 'Import annulé (reset effectué)' : 'Import terminé avec succès')
-
+  // Vérifier qu'au moins un fichier contient des données
+  const hasData = assetsRows.length > 0 || ticketsRows.length > 0 || costsRows.length > 0
+  
+  if (!hasData) {
+    log('error', '❌ Aucune donnée valide à importer (fichiers vides ou non fournis)')
+    console.warn('[ImportService] Aucune donnée à importer')
     return {
-      success: !hasErrors,
+      success: false,
       logs,
       stats: {
-        assets:  assetsStats,
-        tickets: ticketsStats,
-        costs:   costsStats,
-        photos:  photosStats,
+        assets:  { total: 0, created: 0, skipped: 0, errors: 0 },
+        tickets: { total: 0, created: 0, skipped: 0, errors: 0 },
+        costs:   { total: 0, created: 0, errors: 0 },
+        photos:  { total: 0, uploaded: 0, errors: 0 },
+        users:   { total: 0, created: 0, errors: 0 },
+      },
+    }
+  }
+
+  // ── Validation préalable des CSV (uniquement pour les fichiers avec données) ──
+  log('info', '🔍 ─── Validation des CSV ───')
+  
+  const preValidErrors: any[] = []
+  
+  if (assetsRows.length > 0) {
+    log('info', `🔍 Validation de ${assetsRows.length} ligne(s) d'actifs...`)
+    const errors = validateAssetsCsv(assetsRows)
+    preValidErrors.push(...errors.map(e => ({ ...e, sheet: 'Actifs' })))
+    if (errors.length === 0) {
+      log('success', '✅ Validation Actifs : OK')
+    } else {
+      log('warning', `⚠️ Validation Actifs : ${errors.length} erreur(s)`)
+    }
+  }
+  
+  if (ticketsRows.length > 0) {
+    log('info', `🔍 Validation de ${ticketsRows.length} ligne(s) de tickets...`)
+    const errors = validateTicketsCsv(ticketsRows)
+    preValidErrors.push(...errors.map(e => ({ ...e, sheet: 'Tickets' })))
+    if (errors.length === 0) {
+      log('success', '✅ Validation Tickets : OK')
+    } else {
+      log('warning', `⚠️ Validation Tickets : ${errors.length} erreur(s)`)
+    }
+  }
+  
+  if (costsRows.length > 0) {
+    log('info', `🔍 Validation de ${costsRows.length} ligne(s) de coûts...`)
+    const errors = validateCostsCsv(costsRows)
+    preValidErrors.push(...errors.map(e => ({ ...e, sheet: 'Coûts' })))
+    if (errors.length === 0) {
+      log('success', '✅ Validation Coûts : OK')
+    } else {
+      log('warning', `⚠️ Validation Coûts : ${errors.length} erreur(s)`)
+    }
+  }
+
+  if (preValidErrors.length > 0) {
+    for (const e of preValidErrors) {
+      logs.push({
+        level: 'error',
+        message: `[Validation ${e.sheet}] L.${e.lineNumber} — Champ "${e.field}" invalide (valeur: "${e.value}"): ${e.reason}`,
+        timestamp: new Date().toISOString(),
+        lineNumber: e.lineNumber,
+        field: e.field,
+      })
+    }
+    log('error', `❌ Validation échouée — ${preValidErrors.length} erreur(s) détectée(s). Import annulé.`)
+    console.error('[ImportService] Validation échouée:', preValidErrors)
+    return {
+      success: false,
+      logs,
+      stats: {
+        assets:  { total: assetsRows.length, created: 0, skipped: 0, errors: preValidErrors.length },
+        tickets: { total: ticketsRows.length, created: 0, skipped: 0, errors: 0 },
+        costs:   { total: costsRows.length,   created: 0, errors: 0 },
+        photos:  { total: 0, uploaded: 0, errors: 0 },
         users:   userStats,
       },
     }
-  },
+  }
+  log('success', '✅ Validation CSV réussie — aucune erreur de format')
+
+  // ── Import des données (uniquement si des lignes existent) ──
+  
+  let assetsStats = { total: 0, created: 0, skipped: 0, errors: 0 }
+  let ticketsStats = { total: 0, created: 0, skipped: 0, errors: 0 }
+  let costsStats = { total: 0, created: 0, errors: 0 }
+  let photosStats = { total: 0, uploaded: 0, errors: 0 }
+
+  // Import Assets
+  if (assetsRows.length > 0) {
+    progress(10, 'Import des actifs...')
+    log('info', '📦 ─── Import Actifs ───')
+    console.log(`[ImportService] Début import de ${assetsRows.length} actifs`)
+    assetsStats = await importAssets(assetsRows, logs, nameToIdCache, userStats)
+    console.log(`[ImportService] Import actifs terminé: créés=${assetsStats.created}, erreurs=${assetsStats.errors}`)
+  } else {
+    log('info', '📦 Import Actifs : aucun fichier fourni')
+    progress(10, 'Aucun actif à importer')
+  }
+
+  // Import Tickets
+  if (ticketsRows.length > 0) {
+    progress(50, 'Import des tickets...')
+    log('info', '🎫 ─── Import Tickets ───')
+    console.log(`[ImportService] Début import de ${ticketsRows.length} tickets`)
+    ticketsStats = await importTickets(ticketsRows, logs, nameToIdCache, refToGlpiId)
+    console.log(`[ImportService] Import tickets terminé: créés=${ticketsStats.created}, erreurs=${ticketsStats.errors}`)
+  } else {
+    log('info', '🎫 Import Tickets : aucun fichier fourni')
+    progress(50, 'Aucun ticket à importer')
+  }
+
+  // Import Coûts
+  if (costsRows.length > 0) {
+    progress(75, 'Import des coûts...')
+    log('info', '💰 ─── Import Coûts ───')
+    console.log(`[ImportService] Début import de ${costsRows.length} coûts`)
+    costsStats = await importCosts(costsRows, logs, refToGlpiId)
+    console.log(`[ImportService] Import coûts terminé: créés=${costsStats.created}, erreurs=${costsStats.errors}`)
+  } else {
+    log('info', '💰 Import Coûts : aucun fichier fourni')
+    progress(75, 'Aucun coût à importer')
+  }
+
+  // Import Photos
+  if (photosZip) {
+    progress(85, 'Upload des photos...')
+    log('info', '🖼️ ─── Import Photos ───')
+    console.log('[ImportService] Début import photos...')
+    photosStats = await importPhotos(photosZip, logs, nameToIdCache)
+    console.log(`[ImportService] Import photos terminé: uploadées=${photosStats.uploaded}, erreurs=${photosStats.errors}`)
+  } else {
+    log('info', '🖼️ Import Photos : aucun fichier ZIP fourni')
+    progress(85, 'Aucune photo à importer')
+  }
+
+  progress(95, 'Vérification des résultats...')
+
+  const hasErrors = assetsStats.errors > 0 || ticketsStats.errors > 0 || 
+                    costsStats.errors > 0 || photosStats.errors > 0 || userStats.errors > 0
+
+  if (hasErrors) {
+    log('error', '════════ ERREURS DÉTECTÉES — RESET EN COURS ════════')
+    console.error('[ImportService] Erreurs détectées lors de l\'import:', {
+      assets: assetsStats.errors,
+      tickets: ticketsStats.errors,
+      costs: costsStats.errors,
+      photos: photosStats.errors,
+      users: userStats.errors
+    })
+    log('error', `  Actifs: ${assetsStats.errors} erreur(s)`)
+    log('error', `  Tickets: ${ticketsStats.errors} erreur(s)`)
+    log('error', `  Coûts: ${costsStats.errors} erreur(s)`)
+    log('error', `  Photos: ${photosStats.errors} erreur(s)`)
+    log('error', `  Utilisateurs: ${userStats.errors} erreur(s)`)
+    log('error', 'Rollback automatique : suppression de toutes les données importées...')
+    console.warn('[ImportService] Rollback en cours...')
+    
+    try {
+      const resetResults = await resetService.resetDatabase()
+      for (const r of resetResults) {
+        if (r.success) {
+          log('info', `[Reset] ${r.itemtype} — ${r.message ?? 'purgé'}`)
+          console.log(`[ImportService] Reset ${r.itemtype}: succès`)
+        } else {
+          log('warning', `[Reset] ${r.itemtype} — échec purge: ${JSON.stringify(r.error)}`)
+          console.warn(`[ImportService] Reset ${r.itemtype}: échec`, r.error)
+        }
+      }
+      log('info', 'Reset terminé. Base revenue à son état initial.')
+      console.log('[ImportService] Rollback terminé')
+    } catch (resetErr: unknown) {
+      const err = resetErr as { message?: string }
+      log('error', `[Reset] Erreur critique lors du reset : ${err.message}`)
+      console.error('[ImportService] Erreur critique lors du reset:', err)
+    }
+  } else {
+    log('success', '════════════════════════════════════')
+    log('success', `  ✅ Import terminé avec succès — ${userStats.created} utilisateur(s) créé(s)`)
+    log('success', `  📊 Bilan: Actifs(${assetsStats.created}) Tickets(${ticketsStats.created}) Coûts(${costsStats.created}) Photos(${photosStats.uploaded})`)
+    log('success', '════════════════════════════════════')
+    console.log('[ImportService] Import terminé avec succès', {
+      assets: assetsStats.created,
+      tickets: ticketsStats.created,
+      costs: costsStats.created,
+      photos: photosStats.uploaded,
+      users: userStats.created
+    })
+  }
+
+  progress(100, hasErrors ? 'Import annulé (reset effectué)' : 'Import terminé avec succès')
+
+  return {
+    success: !hasErrors,
+    logs,
+    stats: {
+      assets:  assetsStats,
+      tickets: ticketsStats,
+      costs:   costsStats,
+      photos:  photosStats,
+      users:   userStats,
+    },
+  }
+},
 }
 
 export default importService
