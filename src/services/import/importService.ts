@@ -316,6 +316,88 @@ function parseFullName(fullName: string): { firstname: string; lastname: string;
   return { firstname, lastname, login }
 }
 
+// async function resolveOrCreateUser(
+//   fullName: string,
+//   cache: Map<string, number>,
+//   addLog: (level: ImportLogEntry['level'], message: string, details?: unknown) => void,
+//   userStats: { total: number; created: number; errors: number }
+// ): Promise<number | undefined> {
+//   if (!fullName?.trim()) return undefined
+//   const trimmedName = fullName.trim()
+//   if (cache.has(trimmedName)) {
+//     addLog('debug', `[User] Cache hit pour "${trimmedName}" → ID=${cache.get(trimmedName)}`)
+//     return cache.get(trimmedName)!
+//   }
+//   addLog('debug', `[User] Recherche/création de l'utilisateur "${trimmedName}"...`)
+//   userStats.total++
+//   const { firstname, lastname, login } = parseFullName(trimmedName)
+//   addLog('debug', `[User] Parsing → firstname="${firstname}", lastname="${lastname}", login="${login}"`)
+//   try {
+//     const { data: searchByLogin } = await glpiClient.get('/User', {
+//       params: { 'searchText[name]': login, range: '0-1' },
+//     })
+//     if (Array.isArray(searchByLogin) && searchByLogin.length > 0) {
+//       addLog('success', `[User] Trouvé par login: "${trimmedName}" (ID=${searchByLogin[0].id})`)
+//       cache.set(trimmedName, searchByLogin[0].id)
+//       return searchByLogin[0].id
+//     }
+//     const { data: searchByName } = await glpiClient.get('/User', {
+//       params: { 'searchText[realname]': lastname, 'searchText[firstname]': firstname, range: '0-10' },
+//     })
+//     if (Array.isArray(searchByName)) {
+//       const match = searchByName.find((u: Record<string, string>) =>
+//         (u.realname || '').toLowerCase() === lastname.toLowerCase() &&
+//         (u.firstname || '').toLowerCase() === firstname.toLowerCase()
+//       )
+//       if (match) {
+//         addLog('success', `[User] Trouvé par nom/prénom: "${lastname} ${firstname}" (ID=${match.id})`)
+//         cache.set(trimmedName, match.id)
+//         return match.id
+//       }
+//     }
+//     addLog('info', `[User] Non trouvé, création: "${lastname} ${firstname}" (login: ${login})`)
+//     const userPayload = {
+//       name: login, realname: lastname, firstname,
+//       password: '123', password2: '123',
+//       is_active: 1, profiles_id: 0, entities_id: 0,
+//     }
+//     addLog('debug', `[User] Payload: ${JSON.stringify(userPayload)}`)
+//     const { data: created } = await glpiClient.post('/User', { input: userPayload })
+//     addLog('success', `[User] Créé: "${lastname} ${firstname}" (login: ${login}, ID=${created.id})`)
+//     cache.set(trimmedName, created.id)
+//     userStats.created++
+//     return created.id
+//   } catch (e: unknown) {
+//     const err = e as { response?: { data?: unknown; status?: number }; message?: string }
+//     const msg = (err.response?.data as { message?: string })?.[0]?.message ?? ''
+//     if (msg.includes('name already exists') || err.response?.status === 400) {
+//       addLog('warning', `[User] Login "${login}" déjà pris, tentative avec variante...`)
+//       const alternativeLogin = `${login}${Date.now()}`.slice(0, 50)
+//       try {
+//         const { data: created } = await glpiClient.post('/User', {
+//           input: { name: alternativeLogin, realname: lastname, firstname, password: '123', password2: '123', is_active: 1, profiles_id: 0, entities_id: 0 },
+//         })
+//         addLog('success', `[User] Créé avec login alternatif "${alternativeLogin}" (ID=${created.id})`)
+//         cache.set(trimmedName, created.id)
+//         userStats.created++
+//         return created.id
+//       } catch (e2: unknown) {
+//         const err2 = e2 as { message?: string; response?: { data?: unknown } }
+//         addLog('error', `[User] Erreur variante pour "${trimmedName}": ${err2.message}`, err2.response?.data)
+//         userStats.errors++
+//         return undefined
+//       }
+//     }
+//     addLog('error', `[User] Erreur pour "${trimmedName}": ${err.message}`, err.response?.data)
+//     userStats.errors++
+//     return undefined
+//   }
+// }
+
+// ─── Helpers GLPI ─────────────────────────────────────────────────────────────
+
+// Dans importService.ts, remplacer la fonction resolveOrCreateUser
+
 async function resolveOrCreateUser(
   fullName: string,
   cache: Map<string, number>,
@@ -323,78 +405,165 @@ async function resolveOrCreateUser(
   userStats: { total: number; created: number; errors: number }
 ): Promise<number | undefined> {
   if (!fullName?.trim()) return undefined
+  
   const trimmedName = fullName.trim()
+  
+  // Vérifier le cache
   if (cache.has(trimmedName)) {
     addLog('debug', `[User] Cache hit pour "${trimmedName}" → ID=${cache.get(trimmedName)}`)
     return cache.get(trimmedName)!
   }
+
   addLog('debug', `[User] Recherche/création de l'utilisateur "${trimmedName}"...`)
   userStats.total++
+
   const { firstname, lastname, login } = parseFullName(trimmedName)
   addLog('debug', `[User] Parsing → firstname="${firstname}", lastname="${lastname}", login="${login}"`)
+
   try {
+    // 1. RECHERCHE PAR LOGIN (la plus fiable)
+    // const { data: searchByLogin } = await glpiClient.get('/search/User', {
+    //   params: { 
+    //     'criteria[0][field]': '1',  // champ 'name' (login)
+    //     'criteria[0][searchtype]': 'contains',
+    //     'criteria[0][value]': login,
+    //     'range': '0-10'
+    //   },
+    // })
     const { data: searchByLogin } = await glpiClient.get('/User', {
-      params: { 'searchText[name]': login, range: '0-1' },
+      params: { 
+        'searchText[name]': login,
+        'searchText[realname]': lastname,
+        'searchText[firstname]': firstname,
+        range: '0-20' //optionnel 
+      },
     })
-    if (Array.isArray(searchByLogin) && searchByLogin.length > 0) {
-      addLog('success', `[User] Trouvé par login: "${trimmedName}" (ID=${searchByLogin[0].id})`)
-      cache.set(trimmedName, searchByLogin[0].id)
-      return searchByLogin[0].id
-    }
-    const { data: searchByName } = await glpiClient.get('/User', {
-      params: { 'searchText[realname]': lastname, 'searchText[firstname]': firstname, range: '0-10' },
-    })
-    if (Array.isArray(searchByName)) {
-      const match = searchByName.find((u: Record<string, string>) =>
-        (u.realname || '').toLowerCase() === lastname.toLowerCase() &&
-        (u.firstname || '').toLowerCase() === firstname.toLowerCase()
-      )
-      if (match) {
-        addLog('success', `[User] Trouvé par nom/prénom: "${lastname} ${firstname}" (ID=${match.id})`)
-        cache.set(trimmedName, match.id)
-        return match.id
+    
+    const usersByLogin = searchByLogin?.data || []
+    if (usersByLogin.length > 0) {
+      // Chercher une correspondance exacte sur le login
+      const exactMatch = usersByLogin.find((u: any) => u['1'] === login)
+      if (exactMatch) {
+        const userId = exactMatch['2'] || exactMatch.id
+        addLog('success', `[User] Utilisateur trouvé par login: "${login}" (ID=${userId})`)
+        cache.set(trimmedName, userId)
+        return userId
       }
     }
-    addLog('info', `[User] Non trouvé, création: "${lastname} ${firstname}" (login: ${login})`)
-    const userPayload = {
-      name: login, realname: lastname, firstname,
-      password: '123', password2: '123',
-      is_active: 1, profiles_id: 0, entities_id: 0,
+
+    // 2. RECHERCHE PAR NOM + PRÉNOM
+    const { data: searchByName } = await glpiClient.get('/search/User', {
+      params: { 
+        'criteria[0][field]': '3',   // champ 'realname' (nom)
+        'criteria[0][searchtype]': 'contains',
+        'criteria[0][value]': lastname,
+        'criteria[1][link]': 'AND',
+        'criteria[1][field]': '2',   // champ 'firstname' (prénom)
+        'criteria[1][searchtype]': 'contains',
+        'criteria[1][value]': firstname,
+        'range': '0-10'
+      },
+    })
+    
+    const usersByName = searchByName?.data || []
+    if (usersByName.length > 0) {
+      // Chercher une correspondance exacte
+      const exactMatch = usersByName.find((u: any) => 
+        u['3'] === lastname && u['2'] === firstname
+      )
+      if (exactMatch) {
+        const userId = exactMatch['2'] || exactMatch.id
+        addLog('success', `[User] Utilisateur trouvé par nom/prénom: "${lastname} ${firstname}" (ID=${userId})`)
+        cache.set(trimmedName, userId)
+        return userId
+      }
     }
-    addLog('debug', `[User] Payload: ${JSON.stringify(userPayload)}`)
+
+    // 3. Vérifier si l'utilisateur existe déjà par une recherche plus large
+    const { data: searchAll } = await glpiClient.get('/search/User', {
+      params: { 
+        'criteria[0][field]': '1',
+        'criteria[0][searchtype]': 'contains',
+        'criteria[0][value]': lastname.toLowerCase(),
+        'range': '0-20'
+      },
+    })
+    
+    const allUsers = searchAll?.data || []
+    if (allUsers.length > 0) {
+      // Chercher par nom partiel
+      const partialMatch = allUsers.find((u: any) => {
+        const userLogin = u['1'] || ''
+        const userLast = u['3'] || ''
+        const userFirst = u['2'] || ''
+        return userLast.toLowerCase().includes(lastname.toLowerCase()) ||
+               userFirst.toLowerCase().includes(firstname.toLowerCase()) ||
+               userLogin.toLowerCase().includes(lastname.toLowerCase())
+      })
+      
+      if (partialMatch) {
+        const userId = partialMatch['2'] || partialMatch.id
+        addLog('success', `[User] Utilisateur existant trouvé (match partiel): "${partialMatch['3']} ${partialMatch['2']}" (ID=${userId})`)
+        cache.set(trimmedName, userId)
+        return userId
+      }
+    }
+
+    // 4. Si non trouvé, CRÉER l'utilisateur
+    addLog('info', `[User] Utilisateur non trouvé, création: "${lastname} ${firstname}" (login: ${login})`)
+    
+    const userPayload = {
+      name: login,
+      realname: lastname,
+      firstname: firstname,
+      password: '123',
+      password2: '123',
+      is_active: 1,
+      profiles_id: 0,
+      entities_id: 0,
+    }
+    
+    addLog('debug', `[User] Payload création: ${JSON.stringify(userPayload)}`)
+    
     const { data: created } = await glpiClient.post('/User', { input: userPayload })
-    addLog('success', `[User] Créé: "${lastname} ${firstname}" (login: ${login}, ID=${created.id})`)
+    
+    addLog('success', `[User] Utilisateur créé: "${lastname} ${firstname}" (login: ${login}, ID=${created.id})`)
     cache.set(trimmedName, created.id)
     userStats.created++
     return created.id
-  } catch (e: unknown) {
+    
+  } catch (e: any) {
     const err = e as { response?: { data?: unknown; status?: number }; message?: string }
-    const msg = (err.response?.data as { message?: string })?.[0]?.message ?? ''
-    if (msg.includes('name already exists') || err.response?.status === 400) {
-      addLog('warning', `[User] Login "${login}" déjà pris, tentative avec variante...`)
-      const alternativeLogin = `${login}${Date.now()}`.slice(0, 50)
+    
+    // Si l'erreur est "utilisateur existe déjà", on essaie de le récupérer une dernière fois
+    if (err.response?.status === 400 || err.message?.includes('existe déjà')) {
+      addLog('warning', `[User] L'utilisateur semble exister mais n'a pas été trouvé. Recherche finale...`)
+      
+      // Dernière tentative : récupérer tous les utilisateurs et chercher manuellement
       try {
-        const { data: created } = await glpiClient.post('/User', {
-          input: { name: alternativeLogin, realname: lastname, firstname, password: '123', password2: '123', is_active: 1, profiles_id: 0, entities_id: 0 },
-        })
-        addLog('success', `[User] Créé avec login alternatif "${alternativeLogin}" (ID=${created.id})`)
-        cache.set(trimmedName, created.id)
-        userStats.created++
-        return created.id
-      } catch (e2: unknown) {
-        const err2 = e2 as { message?: string; response?: { data?: unknown } }
-        addLog('error', `[User] Erreur variante pour "${trimmedName}": ${err2.message}`, err2.response?.data)
-        userStats.errors++
-        return undefined
+        const { data: allUsers } = await glpiClient.get('/User', { params: { range: '0-500' } })
+        const usersList = Array.isArray(allUsers) ? allUsers : (allUsers.data || [])
+        
+        const found = usersList.find((u: any) => 
+          u.name === login || 
+          (u.realname === lastname && u.firstname === firstname)
+        )
+        
+        if (found) {
+          addLog('success', `[User] Utilisateur récupéré après erreur: ${found.name} (ID=${found.id})`)
+          cache.set(trimmedName, found.id)
+          return found.id
+        }
+      } catch (finalErr) {
+        addLog('error', `[User] Impossible de récupérer l'utilisateur: ${finalErr}`)
       }
     }
+    
     addLog('error', `[User] Erreur pour "${trimmedName}": ${err.message}`, err.response?.data)
     userStats.errors++
     return undefined
   }
 }
-
-// ─── Helpers GLPI ─────────────────────────────────────────────────────────────
 
 async function resolveOrCreate<T extends { id: number }>(
   endpoint: string,
@@ -572,10 +741,39 @@ function parseGlpiDateTime(date: string, time: string): string {
   return `${year}-${month.padStart(2,'0')}-${day.padStart(2,'0')} ${hm}`
 }
 
+// function parseItemsList(raw: string): string[] {
+//   if (!raw) return []
+//   try { return JSON.parse(raw) } catch { /* fall through */ }
+//   return raw.replace(/^\[|\]$/g, '').split(',').map(s => s.replace(/^"|"$/g, '').trim()).filter(Boolean)
+// }
+
 function parseItemsList(raw: string): string[] {
   if (!raw) return []
-  try { return JSON.parse(raw) } catch { /* fall through */ }
-  return raw.replace(/^\[|\]$/g, '').split(',').map(s => s.replace(/^"|"$/g, '').trim()).filter(Boolean)
+  
+  let items: string[] = []
+  
+  try { 
+    // Essayer de parser comme JSON
+    const parsed = JSON.parse(raw)
+    items = Array.isArray(parsed) ? parsed : [parsed]
+  } catch { 
+    // Parsing manuel pour le format ["item1","item2"]
+    items = raw
+      .replace(/^\[|\]$/g, '')
+      .split(',')
+      .map(s => s.replace(/^"|"$/g, '').trim())
+      .filter(Boolean)
+  }
+  
+  // Supprimer les doublons
+  const uniqueItems = [...new Set(items)]
+  
+  // Log si des doublons ont été trouvés
+  if (uniqueItems.length < items.length) {
+    console.warn(`[Tickets] Doublons détectés dans Items: ${items.length} → ${uniqueItems.length} éléments uniques`)
+  }
+  
+  return uniqueItems
 }
 
 async function importTickets(

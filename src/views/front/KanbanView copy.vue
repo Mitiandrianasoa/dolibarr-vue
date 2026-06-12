@@ -12,7 +12,11 @@ const loadError = ref('')
 const allTickets = ref<Ticket[]>([])
 
 // ── Langue ─────────────────────────────────────────────────────
-const currentLang = ref<'fr' | 'mg'>('fr')
+const currentLang = ref<'fr' | 'mg'>('fr')  // 'fr' = français, 'mg' = malgache
+
+function toggleLanguage() {
+  currentLang.value = currentLang.value === 'fr' ? 'mg' : 'fr'
+}
 
 // ── Paramètres Kanban (couleurs + labels malgaches) ─────────
 const colSettings = ref<Record<string, KanbanSetting>>({})
@@ -30,122 +34,66 @@ function colColor(colId: string): string {
   return colSettings.value[colId]?.color ?? ''
 }
 
+function colLabelFr(colId: string): string {
+  // Retourne le label français selon l'ID de colonne
+  const labels: Record<string, string> = {
+    'new': 'Nouveau',
+    'progress': 'En cours',
+    'done': 'Terminé',
+  }
+  return labels[colId] ?? colId
+}
+
 function colLabelMg(colId: string): string {
+  // Retourne le label malgache depuis les settings ou fallback
   const fallback: Record<string, string> = {
     'new': 'Vaovao',
     'progress': 'Efa manao',
-    'planned': 'Voalahatra',
-    'pending': 'Miandry',
     'done': 'Vita',
-    'closed': 'Nakatana'
   }
   return colSettings.value[colId]?.labelMg ?? fallback[colId] ?? colId
 }
 
-function getColumnLabel(col: KanbanColumn): string {
+function getColumnLabel(col: typeof COLUMNS[number]): string {
   if (currentLang.value === 'mg') {
     return colLabelMg(col.id)
   }
-  return col.label
+  return col.label  // label français par défaut
 }
 
-// ============================================================
-// ⚠️ CONFIGURATION DES COLONNES - MODIFIEZ ICI
-// ============================================================
-// Pour AJOUTER une colonne : ajoutez un objet dans le tableau
-// Pour SUPPRIMER une colonne : retirez l'objet du tableau
-// Pour MODIFIER : changez les valeurs (statuses, targetStatus, etc.)
-// ============================================================
-
-interface KanbanColumn {
-  id: string;                    // Identifiant unique (ex: 'new', 'progress')
-  label: string;                 // Nom français affiché
-  statuses: number[];            // Liste des statuts GLPI dans cette colonne
-  targetStatus: number;          // Statut à envoyer à GLPI lors du drop
-  defaultColor: string;          // Couleur par défaut (hex)
-  needsDialog: boolean;          // Affiche un dialogue ? (ex: pour note de résolution)
-  dialogType?: 'resolution' | 'rejection' | 'note';  // Type de dialogue si needed
-}
-
-const COLUMNS: KanbanColumn[] = [
-  // ============================================
-  // COLONNE 1 : NOUVEAU
-  // ============================================
+// ── Colonnes Kanban ─────────────────────────────────────────────
+const COLUMNS = [
   {
     id: 'new',
     label: 'Nouveau',
-    statuses: [1],
+    statuses: [1] as number[],
     targetStatus: 1,
     defaultColor: '#dbeafe',
     needsDialog: false,
   },
-  
-  // ============================================
-  // COLONNE 2 : EN COURS
-  // ============================================
   {
     id: 'progress',
     label: 'En cours',
-    statuses: [2],          // ⚠️ Vous pouvez ajouter 3,4 si besoin
+    // statuses: [2, 3, 4] as number[],
+    statuses: [2] as number[],
     targetStatus: 2,
     defaultColor: '#ffedd5',
     needsDialog: false,
   },
-  
-  // ============================================
-  // COLONNE 3 : PLANIFIÉ (Optionnel - décommentez si besoin)
-  // ============================================
-  // {
-  //   id: 'planned',
-  //   label: 'Planifié',
-  //   statuses: [3],
-  //   targetStatus: 3,
-  //   defaultColor: '#fef9c3',
-  //   needsDialog: false,
-  // },
-  
-  // ============================================
-  // COLONNE 4 : EN ATTENTE (Optionnel - décommentez si besoin)
-  // ============================================
-  // {
-  //   id: 'pending',
-  //   label: 'En attente',
-  //   statuses: [4],
-  //   targetStatus: 4,
-  //   defaultColor: '#e2e8f0',
-  //   needsDialog: false,
-  // },
-  
-  // ============================================
-  // COLONNE 5 : TERMINÉ (Résolu + Fermé)
-  // ============================================
   {
     id: 'done',
     label: 'Terminé',
-    statuses: [5, 6],       // 5=Résolu, 6=Fermé
-    targetStatus: 5,
+    //statuses: [5, 6] as number[],
+    statuses: [6] as number[],
+    targetStatus: 6,
     defaultColor: '#dcfce7',
-    needsDialog: true,      // Dialogue pour note de résolution
-    dialogType: 'resolution',
+    needsDialog: true,
   },
-  
-  // ============================================
-  // COLONNE 6 : REJETÉ (Optionnel - pour tickets refusés)
-  // ============================================
-  // {
-  //   id: 'rejected',
-  //   label: 'Rejeté',
-  //   statuses: [7],        // Si vous avez un statut 7
-  //   targetStatus: 7,
-  //   defaultColor: '#fee2e2',
-  //   needsDialog: true,
-  //   dialogType: 'rejection',
-  // },
-]
+] as const
 
 type ColumnId = typeof COLUMNS[number]['id']
 
-function colTickets(col: KanbanColumn) {
+function colTickets(col: typeof COLUMNS[number]) {
   return allTickets.value.filter(t => (col.statuses as number[]).includes(t.status))
 }
 
@@ -187,7 +135,7 @@ function onDragLeave() {
   dragOverCol.value = null
 }
 
-function onDrop(e: DragEvent, col: KanbanColumn) {
+function onDrop(e: DragEvent, col: typeof COLUMNS[number]) {
   e.preventDefault()
   dragOverCol.value = null
   if (!dragging.value || draggingFromCol.value === col.id) {
@@ -198,14 +146,14 @@ function onDrop(e: DragEvent, col: KanbanColumn) {
   dragging.value = null
 
   if (col.needsDialog) {
-    openStatusDialog(ticket, col.targetStatus, col.dialogType || 'resolution')
+    openStatusDialog(ticket, col.targetStatus)
   } else {
     applyStatusChange(ticket, col.targetStatus)
   }
 }
 
 // ── Mise à jour statut ──────────────────────────────────────────
-async function applyStatusChange(ticket: Ticket, newStatus: number, note?: string, dialogType?: string) {
+async function applyStatusChange(ticket: Ticket, newStatus: number, note?: string) {
   const idx = allTickets.value.findIndex(t => t.id === ticket.id)
   const prev = idx !== -1 ? { ...allTickets.value[idx] } : null
 
@@ -217,17 +165,9 @@ async function applyStatusChange(ticket: Ticket, newStatus: number, note?: strin
     await glpiClient.put(`/Ticket/${ticket.id}`, { input: { status: newStatus } })
 
     if (note?.trim()) {
-      // Pour la résolution, on crée une solution
-      if (dialogType === 'resolution' || newStatus === 5) {
-        await glpiClient.post('/ITILSolution', {
-          input: { items_id: ticket.id, itemtype: 'Ticket', content: note.trim() },
-        }).catch(() => {})
-      } else {
-        // Pour d'autres types, on crée un suivi
-        await glpiClient.post('/ITILFollowup', {
-          input: { items_id: ticket.id, itemtype: 'Ticket', content: note.trim(), is_private: 0 },
-        }).catch(() => {})
-      }
+      await glpiClient.post('/ITILSolution', {
+        input: { items_id: ticket.id, itemtype: 'Ticket', content: note.trim() },
+      }).catch(() => {})
     }
   } catch (e) {
     if (prev && idx !== -1) allTickets.value[idx] = prev
@@ -239,14 +179,12 @@ async function applyStatusChange(ticket: Ticket, newStatus: number, note?: strin
 const showDialog    = ref(false)
 const dialogTicket  = ref<Ticket | null>(null)
 const dialogStatus  = ref(5)
-const dialogType    = ref<'resolution' | 'rejection' | 'note'>('resolution')
-const dialogNote    = ref('')
+const resolutionNote = ref('')
 
-function openStatusDialog(ticket: Ticket, status: number, type: 'resolution' | 'rejection' | 'note' = 'resolution') {
+function openStatusDialog(ticket: Ticket, status: number) {
   dialogTicket.value  = ticket
   dialogStatus.value  = status
-  dialogType.value    = type
-  dialogNote.value    = ''
+  resolutionNote.value = ''
   showDialog.value    = true
 }
 
@@ -257,31 +195,9 @@ function cancelDialog() {
 
 async function confirmDialog() {
   if (!dialogTicket.value) return
-  await applyStatusChange(dialogTicket.value, dialogStatus.value, dialogNote.value, dialogType.value)
+  await applyStatusChange(dialogTicket.value, dialogStatus.value, resolutionNote.value)
   showDialog.value   = false
   dialogTicket.value = null
-}
-
-function getDialogTitle(): string {
-  if (currentLang.value === 'mg') {
-    if (dialogType.value === 'resolution') return 'Hamarino ho vita ?'
-    if (dialogType.value === 'rejection') return 'Mandrà no antony ?'
-    return 'Fanazavana'
-  }
-  if (dialogType.value === 'resolution') return 'Marquer comme terminé ?'
-  if (dialogType.value === 'rejection') return 'Justifier le rejet'
-  return 'Informations supplémentaires'
-}
-
-function getDialogPlaceholder(): string {
-  if (currentLang.value === 'mg') {
-    if (dialogType.value === 'resolution') return 'Soraty ny vahaolana...'
-    if (dialogType.value === 'rejection') return 'Soraty ny antony famerana...'
-    return 'Fanazavana...'
-  }
-  if (dialogType.value === 'resolution') return 'Décrivez la solution apportée…'
-  if (dialogType.value === 'rejection') return 'Expliquez pourquoi ce ticket est rejeté…'
-  return 'Informations supplémentaires…'
 }
 
 // ── Modal détail ticket ─────────────────────────────────────────
@@ -310,7 +226,7 @@ const TYPE_META: Record<number, { label: string; color: string }> = {
 const PRIORITY_META: Record<number, { label: string; color: string }> = {
   1: { label: 'Très basse', color: 'gray'   },
   2: { label: 'Basse',      color: 'green'  },
-  3: { label: 'Moyenne',    color: 'yellow' },
+  3: { label: 'Medium',     color: 'yellow' },
   4: { label: 'Haute',      color: 'orange' },
   5: { label: 'Très haute', color: 'red'    },
   6: { label: 'Majeure',    color: 'red'    },
@@ -368,10 +284,24 @@ onMounted(() => { load(); loadSettings() })
         </div>
       </div>
       <div class="mv-actions">
+        <!-- Sélecteur de langue -->
         <div class="lang-switcher">
-          <button class="lang-btn" :class="{ active: currentLang === 'fr' }" @click="currentLang = 'fr'">🇫🇷 FR</button>
-          <button class="lang-btn" :class="{ active: currentLang === 'mg' }" @click="currentLang = 'mg'">🇲🇬 MG</button>
+          <button 
+            class="lang-btn" 
+            :class="{ active: currentLang === 'fr' }"
+            @click="currentLang = 'fr'"
+          >
+            🇫🇷 FR
+          </button>
+          <button 
+            class="lang-btn" 
+            :class="{ active: currentLang === 'mg' }"
+            @click="currentLang = 'mg'"
+          >
+            🇲🇬 MG
+          </button>
         </div>
+        
         <button class="btn-fetch" @click="load" :disabled="loading">
           <svg v-if="loading" class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <path d="M21 12a9 9 0 1 1-6.219-8.56" />
@@ -387,6 +317,7 @@ onMounted(() => { load(); loadSettings() })
       </div>
     </div>
 
+    <!-- Erreur -->
     <div v-if="loadError" class="alert-error">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
@@ -395,8 +326,8 @@ onMounted(() => { load(); loadSettings() })
       <button class="err-retry" @click="load">Réessayer</button>
     </div>
 
-    <!-- Board Kanban - Le nombre de colonnes s'adapte automatiquement -->
-    <div class="kanban-board" :style="{ gridTemplateColumns: `repeat(${COLUMNS.length}, 1fr)` }">
+    <!-- Board Kanban -->
+    <div class="kanban-board">
       <div
         v-for="col in COLUMNS"
         :key="col.id"
@@ -410,19 +341,23 @@ onMounted(() => { load(); loadSettings() })
         @dragleave="onDragLeave"
         @drop="onDrop($event, col)"
       >
+        <!-- En-tête colonne -->
         <div class="col-header">
           <div class="col-title-wrap">
             <div class="col-title-stack">
+              <!-- Titre principal qui change selon la langue -->
               <span class="col-title">{{ getColumnLabel(col) }}</span>
             </div>
           </div>
           <span class="col-count">{{ colTickets(col).length }}</span>
         </div>
 
+        <!-- Cartes -->
         <div class="col-cards">
           <template v-if="loading">
             <div v-for="n in 2" :key="n" class="card-skeleton"></div>
           </template>
+
           <template v-else>
             <div
               v-for="ticket in colTickets(col)"
@@ -441,6 +376,7 @@ onMounted(() => { load(); loadSettings() })
                   <circle cx="9" cy="19" r="1.5" /><circle cx="15" cy="19" r="1.5" />
                 </svg>
               </div>
+
               <div class="card-content">
                 <div class="card-chips">
                   <span class="badge" :class="`badge-${typeMeta(ticket.type).color}`">
@@ -450,13 +386,16 @@ onMounted(() => { load(); loadSettings() })
                     {{ priorityMeta(ticket.priority ?? 3).label }}
                   </span>
                 </div>
+
                 <p class="card-title">{{ ticket.title }}</p>
+
                 <div class="card-footer">
                   <span class="card-id">#{{ ticket.id }}</span>
                   <span class="card-date">{{ relativeDate(ticket.createdAt) }}</span>
                 </div>
               </div>
             </div>
+
             <div v-if="colTickets(col).length === 0" class="col-empty">
               {{ currentLang === 'mg' ? 'Tsy misy ticket' : 'Aucun ticket' }}
             </div>
@@ -476,11 +415,12 @@ onMounted(() => { load(); loadSettings() })
       </div>
     </div>
 
-    <!-- MODAL DÉTAIL TICKET -->
+    <!-- MODAL DÉTAIL TICKET (inchangé) -->
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="selectedTicket" class="modal-overlay" @click.self="closeDetail">
           <div class="modal-card">
+            <!-- Contenu inchangé -->
             <div class="modal-head">
               <div class="modal-chips">
                 <span class="badge" :class="`badge-${typeMeta(selectedTicket.type).color}`">
@@ -493,7 +433,9 @@ onMounted(() => { load(); loadSettings() })
               </div>
               <button class="modal-close" @click="closeDetail">✕</button>
             </div>
+
             <h2 class="modal-title">{{ selectedTicket.title }}</h2>
+
             <div class="modal-meta">
               <div class="meta-item">
                 <span class="meta-label">{{ currentLang === 'mg' ? 'Namorona' : 'Créé' }}</span>
@@ -508,10 +450,12 @@ onMounted(() => { load(); loadSettings() })
                 <span class="meta-val">{{ formatFull(selectedTicket.solvedAt) }}</span>
               </div>
             </div>
+
             <div v-if="selectedTicket.description" class="modal-section">
               <p class="section-label">{{ currentLang === 'mg' ? 'Famaritana' : 'Description' }}</p>
               <div class="description-box" v-html="selectedTicket.description"></div>
             </div>
+
             <div v-if="loadingItems || linkedItems.length" class="modal-section">
               <p class="section-label">{{ currentLang === 'mg' ? 'Fitaovana mifandraika' : 'Matériels liés' }}</p>
               <div v-if="loadingItems" class="items-loading">{{ currentLang === 'mg' ? 'Fandefasana...' : 'Chargement…' }}</div>
@@ -521,6 +465,7 @@ onMounted(() => { load(); loadSettings() })
                 </span>
               </div>
             </div>
+
             <div class="modal-foot">
               <button class="btn-secondary" @click="closeDetail">{{ currentLang === 'mg' ? 'Hidiana' : 'Fermer' }}</button>
               <button class="btn-primary" @click="closeDetail(); router.push(`/tickets/${selectedTicket!.id}/edit`)">
@@ -532,35 +477,39 @@ onMounted(() => { load(); loadSettings() })
       </Transition>
     </Teleport>
 
-    <!-- DIALOG CONFIRMATION (Adaptatif selon le type) -->
+    <!-- DIALOG CONFIRMATION (inchangé) -->
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="showDialog" class="modal-overlay" @click.self="cancelDialog">
           <div class="dialog-card">
-            <div class="dialog-icon" :class="dialogType">
-              <svg v-if="dialogType === 'resolution'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <div class="dialog-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                 <polyline points="22 4 12 14.01 9 11.01"/>
               </svg>
-              <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="8" x2="12" y2="12"/>
-                <line x1="12" y1="16" x2="12.01" y2="16"/>
-              </svg>
             </div>
-            <h3 class="dialog-title">{{ getDialogTitle() }}</h3>
+
+            <h3 class="dialog-title">{{ currentLang === 'mg' ? 'Hamarino ho vita ?' : 'Marquer comme terminé ?' }}</h3>
             <p class="dialog-sub">
-              {{ currentLang === 'mg' ? 'Ny ticket' : 'Le ticket' }} <strong>#{{ dialogTicket?.id }}</strong>
-              {{ currentLang === 'mg' ? 'dia hovana.' : 'va être modifié.' }}
-              {{ currentLang === 'mg' ? 'Azonao atao ny manoratra fanazavana (tsy voatery).' : 'Vous pouvez ajouter une note (optionnel).' }}
+              {{ currentLang === 'mg' ? 'Ny ticket' : 'Le ticket' }} <strong>#{{ dialogTicket?.id }}</strong> 
+              {{ currentLang === 'mg' ? 'dia hatao vita.' : 'sera marqué comme résolu.' }}
+              {{ currentLang === 'mg' ? 'Azonao atao ny manoratra fanazavana (tsy voatery).' : 'Vous pouvez ajouter une note de résolution (optionnel).' }}
             </p>
+
             <div class="dialog-field">
-              <label>{{ currentLang === 'mg' ? 'Fanazavana' : 'Note' }}</label>
-              <textarea v-model="dialogNote" rows="3" :placeholder="getDialogPlaceholder()"></textarea>
+              <label>{{ currentLang === 'mg' ? 'Fanazavana' : 'Note de résolution' }}</label>
+              <textarea
+                v-model="resolutionNote"
+                rows="3"
+                :placeholder="currentLang === 'mg' ? 'Soraty ny vahaolana...' : 'Décrivez la solution apportée…'"
+              ></textarea>
             </div>
+
             <div class="dialog-actions">
               <button class="btn-secondary" @click="cancelDialog">{{ currentLang === 'mg' ? 'Aoka' : 'Annuler' }}</button>
-              <button class="btn-primary" @click="confirmDialog">{{ currentLang === 'mg' ? 'Hamafy' : 'Confirmer' }}</button>
+              <button class="btn-primary" @click="confirmDialog">
+                {{ currentLang === 'mg' ? 'Hamafy' : 'Confirmer' }}
+              </button>
             </div>
           </div>
         </div>
@@ -572,6 +521,9 @@ onMounted(() => { load(); loadSettings() })
 <style scoped>
 @import '../../styles/KanbanView.css';
 
+/* ============================================
+   SELECTEUR DE LANGUE
+   ============================================ */
 .lang-switcher {
   display: flex;
   gap: 0.25rem;
@@ -600,11 +552,5 @@ onMounted(() => { load(); loadSettings() })
 
 .lang-btn:hover:not(.active) {
   background: #e2e8f0;
-}
-
-.kanban-board {
-  display: grid;
-  gap: 1rem;
-  align-items: start;
 }
 </style>
