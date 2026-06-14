@@ -537,6 +537,7 @@ export async function deleteTicket(
   purge: boolean = false
 ): Promise<{
   totalRequests: number;
+  
   successCount: number;
   errorCount: number;
   results: Array<{ id: number; success: boolean; error?: string }>;

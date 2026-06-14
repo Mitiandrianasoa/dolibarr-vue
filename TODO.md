@@ -18,3 +18,43 @@ BO:
  
  2nd pull 2
  Test-Mitia
+
+
+
+ALEA 1:
+CHANGEMENT DE STATUS TERMINE DANS KANBAN
+BOITE DE DIALOGUE 
+AJOUT SUPER COST. 
+STOCKER DANS SQLITE 
+
+NOUVELLE PAGE COUT:
+COUT original dans un ticket 
+  - si deux elements ou plus dans le tickets diviser le cout fixe
+  - affichage par type 
+  - PLUS SUPER COST DEPUIS SQLITE
+TOTAL 
+
+page des couts afficher par type [moniteur, phone, ordi]
+- depuis glpi
+- sqlite super cout
+
+
+
+Get-ChildrenItem D:\S6\EVAL\EVAL 2\gpli-vue
+Where-Object {$_.LastWriteTime -gt (Get-Date).AddMinutes(-30)} |
+Sort-Object LastWriteTime -Descending|
+Select-Object LastWriteTime , FullName
+
+
+
+ALEA 2:
+- Ticket CLosed l'on peut envoyer in progress
+- Button: 
+  - Annulation effacer dernier supercost depuis sqlite.
+      - supercost liee a ce ticket
+  - Reouverture
+    - champs en pourcentage par exemple 10%
+    - cout de reouverture 10% du supercost
+    - l'on n'efface pas le supercost pour ce dernier
+- page CostReportView.vue
+  - ajout section cost reoverture 

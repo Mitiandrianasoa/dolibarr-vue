@@ -68,6 +68,7 @@ const router = createRouter({
           component: () => import('@/views/back/ImportView.vue'),
           meta: { title: 'Import de données' },
         },
+       
       ],
     },
     {
@@ -97,6 +98,12 @@ const router = createRouter({
           name: 'front-kanban',
           component: () => import('@/views/front/KanbanView.vue'),
           meta: { title: 'Kanban' },
+        },
+         {
+          path: 'costs',
+          name: 'front-costs',
+          component: () => import('@/views/front/CostReportView.vue'),
+          meta: { title: 'Rapport des coûts' },
         },
       ]
     },

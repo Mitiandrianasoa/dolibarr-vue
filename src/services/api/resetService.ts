@@ -12,7 +12,7 @@ const itemtypesToDelete = [
   
   // 2. Ensuite les tickets eux-mêmes
   'Ticket',
-  
+  // 'TicketCost',
   // 3. Puis les assets
   'Computer',
   'Monitor',
@@ -31,6 +31,8 @@ const itemtypesToDelete = [
   'Rack',
   'Enclosure',
   'PDU',
+
+
 ];
 
 const PROTECTED_USERS = ['glpi', 'glpi-system', 'normal', 'post-only', 'tech'];

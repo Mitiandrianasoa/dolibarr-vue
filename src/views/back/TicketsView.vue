@@ -381,12 +381,12 @@ onMounted(load)
           
           <div v-if="loadingCosts" class="loading-state">Chargement des coûts...</div>
           <div v-else-if="ticketCostSummary" class="costs-summary-grid">
-            <div class="costs-card">
+            <!-- <div class="costs-card">
               <div class="costs-card-content">
                 <span class="costs-card-value">{{ formatNumber(ticketCostSummary.totalCost) }} €</span>
                 <span class="costs-card-label">Coût total</span>
               </div>
-            </div>
+            </div> -->
             <div class="costs-card">
               <div class="costs-card-content">
                 <span class="costs-card-value">{{ ticketCostSummary.totalTimeFormatted }}</span>
