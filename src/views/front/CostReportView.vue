@@ -229,7 +229,7 @@ onMounted(load)
             </td>
             <td class="col-amount">
               <span :class="['amount', costsByType[type]?.glpi === 0 ? 'zero' : '']">
-                {{ formatCurrency(costsByType[type]?.glpi || 0) }} Ar
+                {{ formatCurrency(costsByType[type]?.glpi || 0) }} 
               </span>
             </td>
             <td class="col-amount">
@@ -243,7 +243,7 @@ onMounted(load)
               </span>
             </td>
             <td class="col-total">
-              <strong>{{ formatCurrency(costsByType[type]?.total || 0) }} Ar</strong>
+              <strong>{{ formatCurrency(costsByType[type]?.total || 0) }}</strong>
             </td>
           </tr>
         </tbody>

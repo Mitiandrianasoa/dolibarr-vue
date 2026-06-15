@@ -108,6 +108,18 @@ const router = createRouter({
       ]
     },
     { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
+    {
+      path: '/test',
+      // component: () => import('@/components/layout/AppFrontLayout.vue'),
+      children: [
+        {
+          path: 'toDo',
+          name: 'toDo-test',
+          component: () => import('@/views/test/ToDoView.vue'),
+          meta: { title: 'To-Do List' },
+        },
+      ]
+    },
   ],
 })
 

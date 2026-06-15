@@ -45,7 +45,10 @@ Where-Object {$_.LastWriteTime -gt (Get-Date).AddMinutes(-30)} |
 Sort-Object LastWriteTime -Descending|
 Select-Object LastWriteTime , FullName
 
-
+Get-ChildItem "D:\S6\EVAL\EVAL 2\gpli-vue" -File |
+Where-Object {$_.LastWriteTime -gt (Get-Date).AddMinutes(-30)} |
+Sort-Object LastWriteTime -Descending |
+Select-Object LastWriteTime, FullName
 
 ALEA 2:
 - Ticket CLosed l'on peut envoyer in progress
@@ -58,3 +61,9 @@ ALEA 2:
     - l'on n'efface pas le supercost pour ce dernier
 - page CostReportView.vue
   - ajout section cost reoverture 
+
+//REAL LIGNE DE COMMADE QUI MARCHE POUR NOUS 
+Get-ChildItem "D:\S6\EVAL\EVAL 2\gpli-vue" -Recurse |
+Where-Object {$_.LastWriteTime -gt (Get-Date).AddMinutes(-30)} |
+Sort-Object LastWriteTime -Descending |
+Select-Object LastWriteTime, FullName
