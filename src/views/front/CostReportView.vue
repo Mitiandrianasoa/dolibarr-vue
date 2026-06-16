@@ -3,14 +3,17 @@ import { ref, computed, onMounted } from 'vue'
 import {
   getAllTicketCosts,
   fetchGlpiTicketCosts,
+  computeCostReport,
   type TicketCostRecord,
+  type CostEntry,
 } from '@/services/api/ticketCostService'
 
 const loading = ref(true)
 const error = ref('')
-const glpiCosts = ref<TicketCostRecord[]>([])   // Coûts GLPI (import)
-const superCosts = ref<TicketCostRecord[]>([])  // Coûts Kanban (source='kanban')
-const reopenCosts = ref<TicketCostRecord[]>([]) // Coûts de réouverture (source='reopen')
+const openType = ref('')
+const glpiCosts = ref<TicketCostRecord[]>([])
+const superCosts = ref<TicketCostRecord[]>([])
+const reopenCosts = ref<TicketCostRecord[]>([])
 
 const ITEM_TYPE_LABELS: Record<string, string> = {
   Computer: 'Ordinateur',
@@ -101,6 +104,31 @@ const totals = computed(() => {
   
   return { glpi, super: superC, reopen, total, ticketCount: tickets.size }
 })
+
+const allRecords = computed(() => [
+  ...glpiCosts.value,
+  ...superCosts.value,
+  ...reopenCosts.value,
+])
+
+const detailReport = computed(() => computeCostReport(allRecords.value))
+
+function getEntries(type: string): CostEntry[] {
+  const found = detailReport.value.find(r => r.itemType === type)
+  return found?.entries ?? []
+}
+
+function toggleDetail(type: string) {
+  openType.value = openType.value === type ? '' : type
+  console.log('toggleDetail', type, openType.value)
+}
+
+function entryAmount(entry: CostEntry, col: string): number {
+  if (col === 'glpi' && entry.source === 'glpi') return entry.allocatedCost
+  if (col === 'super' && entry.source === 'kanban') return entry.allocatedCost
+  if (col === 'reopen' && entry.source === 'reopen') return entry.allocatedCost
+  return 0
+}
 
 function parseItemTypes(itemTypesJson: string): string[] {
   try {
@@ -222,38 +250,50 @@ onMounted(load)
           </tr>
         </thead>
         <tbody>
-          <tr v-for="type in assetTypes" :key="type">
-            <td class="col-type">
-              <span class="type-icon">{{ getTypeIcon(type) }}</span>
-              {{ getTypeLabel(type) }}
-            </td>
-            <td class="col-amount">
-              <span :class="['amount', costsByType[type]?.glpi === 0 ? 'zero' : '']">
-                {{ formatCurrency(costsByType[type]?.glpi || 0) }} 
-              </span>
-            </td>
-            <td class="col-amount">
-              <span :class="['amount', costsByType[type]?.super === 0 ? 'zero' : 'super']">
-                {{ formatCurrency(costsByType[type]?.super || 0) }} Ar
-              </span>
-            </td>
-            <td class="col-amount">
-              <span :class="['amount', costsByType[type]?.reopen === 0 ? 'zero' : 'reopen']">
-                {{ formatCurrency(costsByType[type]?.reopen || 0) }} Ar
-              </span>
-            </td>
-            <td class="col-total">
-              <strong>{{ formatCurrency(costsByType[type]?.total || 0) }}</strong>
-            </td>
-          </tr>
+          <template v-for="type in assetTypes" :key="type">
+            <tr @click="toggleDetail(type)">
+              <td class="col-type">
+                <span class="type-icon">{{ getTypeIcon(type) }}</span>
+                {{ getTypeLabel(type) }}
+                <span v-if="getEntries(type).length"> ({{ getEntries(type).length }})</span>
+              </td>
+              <td class="col-amount">
+                <span :class="['amount', costsByType[type]?.glpi === 0 ? 'zero' : '']">
+                  {{ formatCurrency(costsByType[type]?.glpi || 0) }} 
+                </span>
+              </td>
+              <td class="col-amount">
+                <span :class="['amount', costsByType[type]?.super === 0 ? 'zero' : 'super']">
+                  {{ formatCurrency(costsByType[type]?.super || 0) }} Ar
+                </span>
+              </td>
+              <td class="col-amount">
+                <span :class="['amount', costsByType[type]?.reopen === 0 ? 'zero' : 'reopen']">
+                  {{ formatCurrency(costsByType[type]?.reopen || 0) }} Ar
+                </span>
+              </td>
+              <td class="col-total">
+                <strong>{{ formatCurrency(costsByType[type]?.total || 0) }}</strong>
+              </td>
+            </tr>
+            <template v-if="openType === type">
+              <tr v-for="entry in getEntries(type)" :key="entry.recordId + '-' + entry.ticketId">
+                <td class="col-type">#{{ entry.ticketId }} {{ entry.ticketTitle }}</td>
+                <td class="col-amount">{{ formatCurrency(entryAmount(entry, 'glpi')) }}</td>
+                <td class="col-amount">{{ formatCurrency(entryAmount(entry, 'super')) }}</td>
+                <td class="col-amount">{{ formatCurrency(entryAmount(entry, 'reopen')) }}</td>
+                <td class="col-total">{{ formatCurrency(entry.allocatedCost) }}</td>
+              </tr>
+            </template>
+          </template>
         </tbody>
         <tfoot>
           <tr class="total-row">
             <td class="col-type"><strong>Total général</strong></td>
-            <td class="col-amount"><strong>{{ formatCurrency(totals.glpi) }} Ar</strong></td>
-            <td class="col-amount"><strong>{{ formatCurrency(totals.super) }} Ar</strong></td>
-            <td class="col-amount"><strong>{{ formatCurrency(totals.reopen) }} Ar</strong></td>
-            <td class="col-total"><strong>{{ formatCurrency(totals.total) }} Ar</strong></td>
+              <td class="col-amount"><strong>{{ formatCurrency(totals.glpi) }} </strong></td>
+            <td class="col-amount"><strong>{{ formatCurrency(totals.super) }} </strong></td>
+            <td class="col-amount"><strong>{{ formatCurrency(totals.reopen) }} </strong></td>
+            <td class="col-total"><strong>{{ formatCurrency(totals.total) }} </strong></td>
           </tr>
           <tr class="tickets-row">
             <td class="col-type"><em>Nombre de tickets</em></td>

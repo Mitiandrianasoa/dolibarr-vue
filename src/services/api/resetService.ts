@@ -1,5 +1,5 @@
 // src/services/api/resetService.ts
-
+import axios from 'axios'
 import { glpiClient } from './glpiClient';
 
 // Liste des types d'éléments à supprimer (dans l'ordre !)
@@ -35,7 +35,13 @@ const itemtypesToDelete = [
 
 ];
 
+const BASE = '/api/ticket-costs'
+
 const PROTECTED_USERS = ['glpi', 'glpi-system', 'normal', 'post-only', 'tech'];
+
+export async function deleteAllTicket(): Promise<void> {
+  await axios.delete(`${BASE}/ticket/deleteAll`)
+}
 
 /**
  * Supprime un élément individuellement (plus fiable que suppression groupée)
@@ -174,7 +180,10 @@ const resetDatabase = async () => {
     console.error('[ResetService] ❌ Erreur utilisateurs:', error.message);
     results.push({ itemtype: 'User (non-system)', success: false, error: error.message });
   }
-  
+  //DELETE SQLITE 
+  await deleteAllTicket(); 
+  console.log('[ResetService] 🧹 Nettoyage de la base SQLite...'); 
+
   // 3. Résumé final
   const successCount = results.filter(r => r.success).length;
   const errorCount = results.filter(r => !r.success).length;

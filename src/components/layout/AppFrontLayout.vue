@@ -38,6 +38,13 @@
             </svg>
             Kanban
           </router-link>
+          <router-link to="/front/costs" class="nav-link" active-class="active" @click="onCostsNav">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 6v6l4 2"/>
+            </svg>
+            Couts
+          </router-link>
         </nav>
       </div>
 
@@ -108,8 +115,11 @@ const showUserMenu = ref(false)
 
 function handleSearch() {
   if (!searchQuery.value.trim()) return
-  // Navigation vers recherche
   router.push(`/front/search?q=${encodeURIComponent(searchQuery.value)}`)
+}
+
+function onCostsNav() {
+  console.log('nav costs', '/front/costs')
 }
 
 async function logout() {

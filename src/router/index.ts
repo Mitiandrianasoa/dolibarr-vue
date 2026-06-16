@@ -68,6 +68,12 @@ const router = createRouter({
           component: () => import('@/views/back/ImportView.vue'),
           meta: { title: 'Import de données' },
         },
+        {
+          path: 'import-mvt',
+          name: 'import-mvt',
+          component: () => import('@/views/back/ImportMvtView.vue'),
+          meta: { title: 'Import mouvement' },
+        },
        
       ],
     },
@@ -117,6 +123,12 @@ const router = createRouter({
           name: 'toDo-test',
           component: () => import('@/views/test/ToDoView.vue'),
           meta: { title: 'To-Do List' },
+        },
+        {
+          path: 'ticketsAnciens',
+          name: 'tickets-anciens-test',
+          component: () => import('@/views/test/TicketTest.vue'),
+          meta: { title: 'Tickets Anciens' },
         },
       ]
     },

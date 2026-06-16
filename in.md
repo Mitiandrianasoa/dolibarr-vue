@@ -1,0 +1,8 @@
+- ne touche que les fichiers que je t'ai mentionne.
+- utilise correctement les fonctions deja existante pour creer nos nouvelles fonctionnalites
+- n'ajoute que les fonctions necessaire, le strict minimum pour realiser notre fonctionnalite.
+- strictement interdit de generer du css,
+- pas de commentaires explicatifs
+- nom de variable simple, pas d'accent, pas d'emoji.
+- ajoute des console.log pour debuger.
+- code simple 

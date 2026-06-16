@@ -154,8 +154,6 @@ export async function getTicketCostSummary(ticketId: number): Promise<TicketCost
   };
 }
 
-// ─── Fonctions existantes ──────────────────────────────────────────────────────
-
 function buildTicketParams(params: TicketSearchParams): Record<string, unknown> {
   const q: Record<string, unknown> = {
     is_deleted: params.includeDeleted ? undefined : 0,

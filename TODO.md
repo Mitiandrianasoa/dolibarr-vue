@@ -20,8 +20,7 @@ BO:
  Test-Mitia
 
 
-
-ALEA 1:
+# ALEA 1:
 CHANGEMENT DE STATUS TERMINE DANS KANBAN
 BOITE DE DIALOGUE 
 AJOUT SUPER COST. 
@@ -48,22 +47,50 @@ Select-Object LastWriteTime , FullName
 Get-ChildItem "D:\S6\EVAL\EVAL 2\gpli-vue" -File |
 Where-Object {$_.LastWriteTime -gt (Get-Date).AddMinutes(-30)} |
 Sort-Object LastWriteTime -Descending |
-Select-Object LastWriteTime, FullName
+Select-Object LastWriteTime, FullName  
 
-ALEA 2:
+
+# ALEA 2:
 - Ticket CLosed l'on peut envoyer in progress
 - Button: 
   - Annulation effacer dernier supercost depuis sqlite.
       - supercost liee a ce ticket
   - Reouverture
     - champs en pourcentage par exemple 10%
-    - cout de reouverture 10% du supercost
+    - cout de reouverture 10% du dernier supercost
     - l'on n'efface pas le supercost pour ce dernier
 - page CostReportView.vue
   - ajout section cost reoverture 
 
-//REAL LIGNE DE COMMADE QUI MARCHE POUR NOUS 
+# REAL LIGNE DE COMMADE QUI MARCHE POUR NOUS 
 Get-ChildItem "D:\S6\EVAL\EVAL 2\gpli-vue" -Recurse |
 Where-Object {$_.LastWriteTime -gt (Get-Date).AddMinutes(-30)} |
 Sort-Object LastWriteTime -Descending |
 Select-Object LastWriteTime, FullName
+
+# ALEA 3 
+- nouvelle page import: import mouvement 
+  - csv 3 colonnes 
+    - ticket(ref ticket)
+    - mvt
+    - valeur
+  par exemple ticket 1, open, 5(reouverture)
+                      2, canceled, (annuler ticket)
+                      2, closed, 100 (terminer avec supercout 100 a inserer dans sqlite)
+  - function importService
+      - MouvementInsert(csv)
+    - page costReportView a modifier:
+      - details pour chaque categories:
+          - items/assets + cout
+
+Ticket 1 
+terminer 100
+reouverture 5
+terminer 45
+
+Ticket 2 
+reouverture 10
+terminer 100
+
+
+

@@ -66,14 +66,14 @@ async function toggleComplete(todo: Todo) {
   }
 }
 
-void Helllo() {
-  try {
-   console.log("test get child");
-  } catch (err) {
-    console.error(err);
-    error.value = 'Failed to update todo';
-  }
-}
+// void Helllo() {
+//   try {
+//    console.log("test get child");
+//   } catch (err) {
+//     console.error(err);
+//     error.value = 'Failed to update todo';
+//   }
+// }
 
 // Supprimer un todo
 async function removeTodo(id: number) {
@@ -115,7 +115,7 @@ const percentageCompleted = computed(() => {
     
     <!-- Affichage des erreurs -->
     <div v-if="error" class="error">{{ error }}</div>
-    <p>{{Helllo()}}</p>
+    <!-- <p>{{Helllo()}}</p> -->
     <!-- Chargement -->
     <div v-if="loading" class="loading">Chargement...</div>
     

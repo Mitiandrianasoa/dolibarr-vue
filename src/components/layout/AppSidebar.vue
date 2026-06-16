@@ -124,6 +124,7 @@ const mainNav = [
   { to: '/tickets',   label: 'Tickets',        icon: icons.tickets, count: null },
   // AppSidebar.vue — ajouter dans orgNav ou adminNav
   { to: '/import', label: 'Import CSV', icon: icons.import },
+  {to:'import-mvt', label:'Import MVT', icon: icons.import},
   { to: '/kanban-settings', label: 'Paramètres Kanban',  icon: icons.kanbanSettings },
 
 ]
