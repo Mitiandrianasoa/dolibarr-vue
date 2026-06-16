@@ -71,7 +71,7 @@ const router = createRouter({
         {
           path: 'import-mvt',
           name: 'import-mvt',
-          component: () => import('@/views/back/ImportCoutView.vue'),
+          component: () => import('@/views/back/ImportMvtView.vue'),
           meta: { title: 'Import mouvement' },
         },
        
