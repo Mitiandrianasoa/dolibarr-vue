@@ -140,13 +140,13 @@ function getTypeLabel(type: string): string {
 
 function getTypeIcon(type: string): string {
   const icons: Record<string, string> = {
-    Computer: '🖥️',
-    Monitor: '🖥️',
-    Printer: '🖨️',
-    Phone: '📞',
-    NetworkEquipment: '🌐',
+    Computer: '',
+    Monitor: '',
+    Printer: '',
+    Phone: '',
+    NetworkEquipment: '',
   }
-  return icons[type] || '📦'
+  return icons[type] || ''
 }
 
 function getSourceLabel(source: string): string {

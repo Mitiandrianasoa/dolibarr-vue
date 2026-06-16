@@ -83,6 +83,9 @@ Select-Object LastWriteTime, FullName
       - details pour chaque categories:
           - items/assets + cout
 
+
+# ALEA 4:
+
 Ticket 1 
 terminer 100
 reouverture 5
