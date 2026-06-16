@@ -1084,11 +1084,11 @@ export interface MvtImportResult {
   stats: { total: number; ok: number; errors: number }
 }
 
-interface MvtRow {
-  ticket: string
-  mvt: string
-  valeur: string
-}
+// interface MvtRow {
+//   ticket: string
+//   mvt: string
+//   valeur: string
+// }
 
 function saveTicketRefMap(map: Map<string, number>) {
   const obj: Record<string, number> = {}
@@ -1097,16 +1097,16 @@ function saveTicketRefMap(map: Map<string, number>) {
   console.log('saveTicketRefMap', obj)
 }
 
-function loadTicketRefMap(): Map<string, number> {
-  try {
-    const raw = localStorage.getItem(REF_MAP_KEY)
-    if (!raw) return new Map()
-    const obj = JSON.parse(raw) as Record<string, number>
-    return new Map(Object.entries(obj).map(([k, v]) => [k, Number(v)]))
-  } catch {
-    return new Map()
-  }
-}
+// function loadTicketRefMap(): Map<string, number> {
+//   try {
+//     const raw = localStorage.getItem(REF_MAP_KEY)
+//     if (!raw) return new Map()
+//     const obj = JSON.parse(raw) as Record<string, number>
+//     return new Map(Object.entries(obj).map(([k, v]) => [k, Number(v)]))
+//   } catch {
+//     return new Map()
+//   }
+// }
 
 // async function getTicketByRef(ref: string): Promise<number | null> {
 //   console.log('getTicketByRef', ref)
@@ -1127,163 +1127,164 @@ function loadTicketRefMap(): Map<string, number> {
 //   }
 //   return null
 // }
-async function getTicketByRef(ref: string): Promise<number | null> {
-  console.log('[getTicketByRef] Recherche ticket par référence:', ref);
+
+// async function getTicketByRef(ref: string): Promise<number | null> {
+//   console.log('[getTicketByRef] Recherche ticket par référence:', ref);
   
-  // 1. Vérifier si c'est un ID
-  const numericId = parseInt(ref, 10);
-  if (!isNaN(numericId) && numericId > 0) {
-    try {
-      await fetchTicketById(numericId);
-      console.log('[getTicketByRef] Trouvé par ID:', numericId);
-      return numericId;
-    } catch (e) {
-      // Pas trouvé par ID
-    }
-  }
+//   // 1. Vérifier si c'est un ID
+//   const numericId = parseInt(ref, 10);
+//   if (!isNaN(numericId) && numericId > 0) {
+//     try {
+//       await fetchTicketById(numericId);
+//       console.log('[getTicketByRef] Trouvé par ID:', numericId);
+//       return numericId;
+//     } catch (e) {
+//       // Pas trouvé par ID
+//     }
+//   }
   
-  // 2. Recherche via l'endpoint Ticket avec filtre name
-  try {
-    const { data } = await glpiClient.get('/Ticket', {
-      params: {
-        'searchText[name]': ref,
-        'range': '0-10'
-      }
-    });
+//   // 2. Recherche via l'endpoint Ticket avec filtre name
+//   try {
+//     const { data } = await glpiClient.get('/Ticket', {
+//       params: {
+//         'searchText[name]': ref,
+//         'range': '0-10'
+//       }
+//     });
     
-    const tickets = Array.isArray(data) ? data : (data?.data || []);
+//     const tickets = Array.isArray(data) ? data : (data?.data || []);
     
-    // Chercher correspondance exacte
-    const exactMatch = tickets.find((t: any) => t.name === ref);
-    if (exactMatch) {
-      console.log('[getTicketByRef] Trouvé par name exact:', ref, '→ ID:', exactMatch.id);
-      return exactMatch.id;
-    }
+//     // Chercher correspondance exacte
+//     const exactMatch = tickets.find((t: any) => t.name === ref);
+//     if (exactMatch) {
+//       console.log('[getTicketByRef] Trouvé par name exact:', ref, '→ ID:', exactMatch.id);
+//       return exactMatch.id;
+//     }
     
-    if (tickets.length === 1) {
-      console.log('[getTicketByRef] Trouvé par name (unique):', ref, '→ ID:', tickets[0].id);
-      return tickets[0].id;
-    }
+//     if (tickets.length === 1) {
+//       console.log('[getTicketByRef] Trouvé par name (unique):', ref, '→ ID:', tickets[0].id);
+//       return tickets[0].id;
+//     }
     
-    if (tickets.length > 1) {
-      console.warn('[getTicketByRef] Plusieurs tickets trouvés:', tickets.map((t: any) => ({ id: t.id, name: t.name })));
-    }
-  } catch (error) {
-    console.error('[getTicketByRef] Erreur recherche:', error);
-  }
+//     if (tickets.length > 1) {
+//       console.warn('[getTicketByRef] Plusieurs tickets trouvés:', tickets.map((t: any) => ({ id: t.id, name: t.name })));
+//     }
+//   } catch (error) {
+//     console.error('[getTicketByRef] Erreur recherche:', error);
+//   }
   
-  console.log('[getTicketByRef] Aucun ticket trouvé pour:', ref);
-  return null;
-}
+//   console.log('[getTicketByRef] Aucun ticket trouvé pour:', ref);
+//   return null;
+// }
 
-async function applyTicketStatus(ticketId: number, newStatus: number) {
-  console.log('applyTicketStatus', ticketId, newStatus)
-  await glpiClient.put(`/Ticket/${ticketId}`, { input: { status: newStatus } })
-}
+// async function applyTicketStatus(ticketId: number, newStatus: number) {
+//   console.log('applyTicketStatus', ticketId, newStatus)
+//   await glpiClient.put(`/Ticket/${ticketId}`, { input: { status: newStatus } })
+// }
 
-function normalizeMvtRow(row: Record<string, string>): MvtRow {
-  const get = (names: string[]) => {
-    for (const key of Object.keys(row)) {
-      if (names.includes(key.toLowerCase().trim())) return row[key]?.trim() ?? ''
-    }
-    return ''
-  }
-  return {
-    ticket: get(['ticket', 'ref', 'num_ticket']),
-    mvt: get(['status', 'Status', 'movement']),
-    valeur: get(['valeur','Valeur', 'value']),
-  }
-}
+// function normalizeMvtRow(row: Record<string, string>): MvtRow {
+//   const get = (names: string[]) => {
+//     for (const key of Object.keys(row)) {
+//       if (names.includes(key.toLowerCase().trim())) return row[key]?.trim() ?? ''
+//     }
+//     return ''
+//   }
+//   return {
+//     ticket: get(['ticket', 'ref', 'num_ticket']),
+//     mvt: get(['status', 'Status', 'mvt']),
+//     valeur: get(['valeur','Valeur', 'value']),
+//   }
+// }
 
-async function importMvtRows(
-  rows: Record<string, string>[],
-  logs: ImportLogEntry[],
-): Promise<MvtImportResult['stats']> {
-  const stats = { total: rows.length, ok: 0, errors: 0 }
-  const addLog = (level: ImportLogEntry['level'], message: string, lineNumber?: number) => {
-    logs.push({ level, message, timestamp: new Date().toISOString(), lineNumber })
-  }
+// async function importMvtRows(
+//   rows: Record<string, string>[],
+//   logs: ImportLogEntry[],
+// ): Promise<MvtImportResult['stats']> {
+//   const stats = { total: rows.length, ok: 0, errors: 0 }
+//   const addLog = (level: ImportLogEntry['level'], message: string, lineNumber?: number) => {
+//     logs.push({ level, message, timestamp: new Date().toISOString(), lineNumber })
+//   }
 
-  for (let i = 0; i < rows.length; i++) {
-    const lineNumber = i + 1
-    const row = normalizeMvtRow(rows[i])
-    console.log('importMvt row', lineNumber, row)
+//   for (let i = 0; i < rows.length; i++) {
+//     const lineNumber = i + 1
+//     const row = normalizeMvtRow(rows[i])
+//     console.log('importMvt row', lineNumber, row)
 
-    if (!row.ticket || !row.mvt) {
-      addLog('error', `[Mvt] L.${lineNumber} ticket ou mvt manquant`, lineNumber)
-      stats.errors++
-      continue
-    }
+//     if (!row.ticket || !row.mvt) {
+//       addLog('error', `[Mvt] L.${lineNumber} ticket ou mvt manquant`, lineNumber)
+//       stats.errors++
+//       continue
+//     }
 
-    const ticketId = await getTicketByRef(row.ticket)
-    if (!ticketId) {
-      addLog('error', `[Mvt] L.${lineNumber} ticket ref ${row.ticket} introuvable`, lineNumber)
-      stats.errors++
-      continue
-    }
+//     const ticketId = await getTicketByRef(row.ticket)
+//     if (!ticketId) {
+//       addLog('error', `[Mvt] L.${lineNumber} ticket ref ${row.ticket} introuvable`, lineNumber)
+//       stats.errors++
+//       continue
+//     }
 
-    const mvt = row.mvt.toLowerCase()
-    const val = row.valeur ? parseFloat(row.valeur.replace(',', '.')) : 0
+//     const mvt = row.mvt.toLowerCase()
+//     const val = row.valeur ? parseFloat(row.valeur.replace(',', '.')) : 0
 
-    try {
-      const ticket = await fetchTicketById(ticketId)
-      const items = await fetchTicketItems(ticketId)
-      const types = items.map((i: any) => i.itemtype).filter(Boolean)
+//     try {
+//       const ticket = await fetchTicketById(ticketId)
+//       const items = await fetchTicketItems(ticketId)
+//       const types = items.map((i: any) => i.itemtype).filter(Boolean)
 
-      if (mvt === 'open') {
-        await applyTicketStatus(ticketId, 2)
-        if (val > 0) {
-          const latest = await getLatestTicketCost(ticketId)
-          const lastCost = latest?.fixedCost ?? 0
-          const reopenCost = Math.round((lastCost * val / 100) * 100) / 100
-          console.log('open reopenCost', ticketId, reopenCost, val, lastCost)
-          if (reopenCost > 0) {
-            await saveTicketCost({
-              ticketId: ticket.id,
-              ticketTitle: ticket.title,
-              fixedCost: reopenCost,
-              itemCount: types.length || 1,
-              itemTypes: JSON.stringify(types),
-              source: 'reopen',
-            })
-          }
-        }
-        addLog('success', `[Mvt] L.${lineNumber} open ticket ${row.ticket} id ${ticketId}`, lineNumber)
-        stats.ok++
-      } else if (mvt === 'closed') {
-        await applyTicketStatus(ticketId, 6)
-        if (val > 0) {
-          console.log('closed supercost', ticketId, val)
-          await saveTicketCost({
-            ticketId: ticket.id,
-            ticketTitle: ticket.title,
-            fixedCost: val,
-            itemCount: types.length || 1,
-            itemTypes: JSON.stringify(types),
-            source: 'kanban',
-          })
-        }
-        addLog('success', `[Mvt] L.${lineNumber} closed ticket ${row.ticket} id ${ticketId}`, lineNumber)
-        stats.ok++
-      } else if (mvt === 'canceled') {
-        await deleteTicket([ticketId])
-        console.log('canceled ticket', ticketId)
-        addLog('success', `[Mvt] L.${lineNumber} canceled ticket ${row.ticket} id ${ticketId}`, lineNumber)
-        stats.ok++
-      } else {
-        addLog('error', `[Mvt] L.${lineNumber} mvt inconnu: ${row.mvt}`, lineNumber)
-        stats.errors++
-      }
-    } catch (e: unknown) {
-      const err = e as { message?: string }
-      addLog('error', `[Mvt] L.${lineNumber} erreur: ${err.message}`, lineNumber)
-      console.log('importMvt error', lineNumber, err.message)
-      stats.errors++
-    }
-  }
+//       if (mvt === 'open') {
+//         await applyTicketStatus(ticketId, 2)
+//         if (val > 0) {
+//           const latest = await getLatestTicketCost(ticketId)
+//           const lastCost = latest?.fixedCost ?? 0
+//           const reopenCost = Math.round((lastCost * val / 100) * 100) / 100
+//           console.log('open reopenCost', ticketId, reopenCost, val, lastCost)
+//           if (reopenCost > 0) {
+//             await saveTicketCost({
+//               ticketId: ticket.id,
+//               ticketTitle: ticket.title,
+//               fixedCost: reopenCost,
+//               itemCount: types.length || 1,
+//               itemTypes: JSON.stringify(types),
+//               source: 'reopen',
+//             })
+//           }
+//         }
+//         addLog('success', `[Mvt] L.${lineNumber} open ticket ${row.ticket} id ${ticketId}`, lineNumber)
+//         stats.ok++
+//       } else if (mvt === 'closed') {
+//         await applyTicketStatus(ticketId, 6)
+//         if (val > 0) {
+//           console.log('closed supercost', ticketId, val)
+//           await saveTicketCost({
+//             ticketId: ticket.id,
+//             ticketTitle: ticket.title,
+//             fixedCost: val,
+//             itemCount: types.length || 1,
+//             itemTypes: JSON.stringify(types),
+//             source: 'kanban',
+//           })
+//         }
+//         addLog('success', `[Mvt] L.${lineNumber} closed ticket ${row.ticket} id ${ticketId}`, lineNumber)
+//         stats.ok++
+//       } else if (mvt === 'canceled') {
+//         await deleteTicket([ticketId])
+//         console.log('canceled ticket', ticketId)
+//         addLog('success', `[Mvt] L.${lineNumber} canceled ticket ${row.ticket} id ${ticketId}`, lineNumber)
+//         stats.ok++
+//       } else {
+//         addLog('error', `[Mvt] L.${lineNumber} mvt inconnu: ${row.mvt}`, lineNumber)
+//         stats.errors++
+//       }
+//     } catch (e: unknown) {
+//       const err = e as { message?: string }
+//       addLog('error', `[Mvt] L.${lineNumber} erreur: ${err.message}`, lineNumber)
+//       console.log('importMvt error', lineNumber, err.message)
+//       stats.errors++
+//     }
+//   }
 
-  return stats
-}
+//   return stats
+// }
 
 // ─── Point d'entrée principal ─────────────────────────────────────────────────
 
@@ -1297,17 +1298,17 @@ export const importService = {
   parseCSV,
   readFileAsText,
 
-  async MouvementInsert(csvFile: File): Promise<MvtImportResult> {
-    console.log('MouvementInsert start', csvFile.name)
-    const logs: ImportLogEntry[] = []
-    const csv = await readFileAsText(csvFile)
-    const rows = parseCSV(csv)
-    console.log('MouvementInsert rows', rows.length)
-    const stats = await importMvtRows(rows, logs)
-    const result = { success: stats.errors === 0, logs, stats }
-    console.log('MouvementInsert done', result)
-    return result
-  },
+  // async MouvementInsert(csvFile: File): Promise<MvtImportResult> {
+  //   console.log('MouvementInsert start', csvFile.name)
+  //   const logs: ImportLogEntry[] = []
+  //   const csv = await readFileAsText(csvFile)
+  //   const rows = parseCSV(csv)
+  //   console.log('MouvementInsert rows', rows.length)
+  //   const stats = await importMvtRows(rows, logs)
+  //   const result = { success: stats.errors === 0, logs, stats }
+  //   console.log('MouvementInsert done', result)
+  //   return result
+  // },
 
   /**
    * Lance l'import complet.

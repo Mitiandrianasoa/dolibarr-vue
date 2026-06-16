@@ -3,17 +3,17 @@ import { ref, computed, onMounted } from 'vue'
 import {
   getAllTicketCosts,
   fetchGlpiTicketCosts,
-  computeCostReport,
   type TicketCostRecord,
-  type CostEntry,
 } from '@/services/api/ticketCostService'
 
 const loading = ref(true)
 const error = ref('')
-const openType = ref('')
 const glpiCosts = ref<TicketCostRecord[]>([])
 const superCosts = ref<TicketCostRecord[]>([])
 const reopenCosts = ref<TicketCostRecord[]>([])
+
+// État pour l'ouverture/fermeture des détails
+const openCategory = ref<string | null>(null)
 
 const ITEM_TYPE_LABELS: Record<string, string> = {
   Computer: 'Ordinateur',
@@ -35,6 +35,7 @@ const costsByType = computed(() => {
     reopen: number
     total: number
     ticketCount: Set<number>
+    entries: { ticketId: number; ticketTitle: string; cost: number; source: string }[]
   }> = {}
 
   // Initialiser pour chaque type
@@ -44,7 +45,8 @@ const costsByType = computed(() => {
       super: 0,
       reopen: 0,
       total: 0,
-      ticketCount: new Set<number>()
+      ticketCount: new Set<number>(),
+      entries: []
     }
   })
 
@@ -57,6 +59,12 @@ const costsByType = computed(() => {
         result[type].glpi += costPerItem
         result[type].total += costPerItem
         result[type].ticketCount.add(cost.ticketId)
+        result[type].entries.push({
+          ticketId: cost.ticketId,
+          ticketTitle: cost.ticketTitle,
+          cost: costPerItem,
+          source: 'glpi'
+        })
       }
     })
   })
@@ -70,6 +78,12 @@ const costsByType = computed(() => {
         result[type].super += costPerItem
         result[type].total += costPerItem
         result[type].ticketCount.add(cost.ticketId)
+        result[type].entries.push({
+          ticketId: cost.ticketId,
+          ticketTitle: cost.ticketTitle,
+          cost: costPerItem,
+          source: 'kanban'
+        })
       }
     })
   })
@@ -83,6 +97,12 @@ const costsByType = computed(() => {
         result[type].reopen += costPerItem
         result[type].total += costPerItem
         result[type].ticketCount.add(cost.ticketId)
+        result[type].entries.push({
+          ticketId: cost.ticketId,
+          ticketTitle: cost.ticketTitle,
+          cost: costPerItem,
+          source: 'reopen'
+        })
       }
     })
   })
@@ -105,31 +125,6 @@ const totals = computed(() => {
   return { glpi, super: superC, reopen, total, ticketCount: tickets.size }
 })
 
-const allRecords = computed(() => [
-  ...glpiCosts.value,
-  ...superCosts.value,
-  ...reopenCosts.value,
-])
-
-const detailReport = computed(() => computeCostReport(allRecords.value))
-
-function getEntries(type: string): CostEntry[] {
-  const found = detailReport.value.find(r => r.itemType === type)
-  return found?.entries ?? []
-}
-
-function toggleDetail(type: string) {
-  openType.value = openType.value === type ? '' : type
-  console.log('toggleDetail', type, openType.value)
-}
-
-function entryAmount(entry: CostEntry, col: string): number {
-  if (col === 'glpi' && entry.source === 'glpi') return entry.allocatedCost
-  if (col === 'super' && entry.source === 'kanban') return entry.allocatedCost
-  if (col === 'reopen' && entry.source === 'reopen') return entry.allocatedCost
-  return 0
-}
-
 function parseItemTypes(itemTypesJson: string): string[] {
   try {
     const types = JSON.parse(itemTypesJson || '[]')
@@ -145,17 +140,31 @@ function getTypeLabel(type: string): string {
 
 function getTypeIcon(type: string): string {
   const icons: Record<string, string> = {
-    Computer: '',
-    Monitor: '',
-    Printer: '',
-    Phone: '',
-    NetworkEquipment: '',
+    Computer: '🖥️',
+    Monitor: '🖥️',
+    Printer: '🖨️',
+    Phone: '📞',
+    NetworkEquipment: '🌐',
   }
-  return icons[type] || ''
+  return icons[type] || '📦'
 }
 
-function fmt(n: number): string {
-  return n.toFixed(2)
+function getSourceLabel(source: string): string {
+  switch (source) {
+    case 'glpi': return 'GLPI'
+    case 'kanban': return 'Super coût'
+    case 'reopen': return 'Réouverture'
+    default: return source
+  }
+}
+
+function getSourceClass(source: string): string {
+  switch (source) {
+    case 'glpi': return 'badge-glpi'
+    case 'kanban': return 'badge-kanban'
+    case 'reopen': return 'badge-reopen'
+    default: return ''
+  }
 }
 
 function formatCurrency(n: number): string {
@@ -165,6 +174,23 @@ function formatCurrency(n: number): string {
   }).format(n)
 }
 
+function formatDate(dateStr: string): string {
+  if (!dateStr) return '-'
+  return new Date(dateStr).toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  })
+}
+
+function toggleCategory(type: string) {
+  if (openCategory.value === type) {
+    openCategory.value = null
+  } else {
+    openCategory.value = type
+  }
+}
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -172,12 +198,10 @@ async function load() {
   try {
     const allCosts = await getAllTicketCosts()
     
-    // Séparer les coûts par source
     glpiCosts.value = allCosts.filter(c => c.source === 'glpi')
     superCosts.value = allCosts.filter(c => c.source === 'kanban')
     reopenCosts.value = allCosts.filter(c => c.source === 'reopen')
     
-    // Aussi récupérer les coûts GLPI depuis l'API GLPI directement
     const glpiFromApi = await fetchGlpiTicketCosts()
     glpiCosts.value = [...glpiCosts.value, ...glpiFromApi]
     
@@ -187,13 +211,6 @@ async function load() {
   } finally {
     loading.value = false
   }
-}
-
-// Fonction pour obtenir la classe CSS de la colonne total
-function getTotalClass(value: number): string {
-  if (value === 0) return 'total-zero'
-  if (value > 1000) return 'total-high'
-  return 'total-medium'
 }
 
 onMounted(load)
@@ -251,38 +268,78 @@ onMounted(load)
         </thead>
         <tbody>
           <template v-for="type in assetTypes" :key="type">
-            <tr @click="toggleDetail(type)">
+            <!-- Ligne principale cliquable -->
+            <tr @click="toggleCategory(type)" class="clickable-row">
               <td class="col-type">
                 <span class="type-icon">{{ getTypeIcon(type) }}</span>
                 {{ getTypeLabel(type) }}
-                <span v-if="getEntries(type).length"> ({{ getEntries(type).length }})</span>
+                <span class="ticket-count-badge">{{ costsByType[type]?.ticketCount.size || 0 }} ticket(s)</span>
               </td>
               <td class="col-amount">
                 <span :class="['amount', costsByType[type]?.glpi === 0 ? 'zero' : '']">
-                  {{ formatCurrency(costsByType[type]?.glpi || 0) }} 
+                  {{ formatCurrency(costsByType[type]?.glpi || 0) }}
                 </span>
               </td>
               <td class="col-amount">
                 <span :class="['amount', costsByType[type]?.super === 0 ? 'zero' : 'super']">
-                  {{ formatCurrency(costsByType[type]?.super || 0) }} Ar
+                  {{ formatCurrency(costsByType[type]?.super || 0) }}
                 </span>
               </td>
               <td class="col-amount">
                 <span :class="['amount', costsByType[type]?.reopen === 0 ? 'zero' : 'reopen']">
-                  {{ formatCurrency(costsByType[type]?.reopen || 0) }} Ar
+                  {{ formatCurrency(costsByType[type]?.reopen || 0) }}
                 </span>
               </td>
               <td class="col-total">
                 <strong>{{ formatCurrency(costsByType[type]?.total || 0) }}</strong>
               </td>
             </tr>
-            <template v-if="openType === type">
-              <tr v-for="entry in getEntries(type)" :key="entry.recordId + '-' + entry.ticketId">
-                <td class="col-type">#{{ entry.ticketId }} {{ entry.ticketTitle }}</td>
-                <td class="col-amount">{{ formatCurrency(entryAmount(entry, 'glpi')) }}</td>
-                <td class="col-amount">{{ formatCurrency(entryAmount(entry, 'super')) }}</td>
-                <td class="col-amount">{{ formatCurrency(entryAmount(entry, 'reopen')) }}</td>
-                <td class="col-total">{{ formatCurrency(entry.allocatedCost) }}</td>
+
+            <!-- Lignes de détail (affichées si la catégorie est ouverte) -->
+            <template v-if="openCategory === type && costsByType[type]?.entries.length">
+              <tr class="detail-header-row">
+                <td colspan="5" class="detail-header">
+                  <span>📋 Détail des tickets - {{ getTypeLabel(type) }}</span>
+                </td>
+              </tr>
+              <tr 
+                v-for="(entry, idx) in costsByType[type].entries" 
+                :key="idx"
+                class="detail-row"
+              >
+                <td class="col-type detail-col-type">
+                  <span class="detail-ticket-id">#{{ entry.ticketId }}</span>
+                  <span class="detail-ticket-title">{{ entry.ticketTitle }}</span>
+                </td>
+                <td class="col-amount">
+                  <span v-if="entry.source === 'glpi'" class="detail-amount">
+                    {{ formatCurrency(entry.cost) }}
+                  </span>
+                </td>
+                <td class="col-amount">
+                  <span v-if="entry.source === 'kanban'" class="detail-amount super">
+                    {{ formatCurrency(entry.cost) }}
+                  </span>
+                </td>
+                <td class="col-amount">
+                  <span v-if="entry.source === 'reopen'" class="detail-amount reopen">
+                    {{ formatCurrency(entry.cost) }}
+                  </span>
+                </td>
+                <td class="col-total">
+                  <span class="badge" :class="getSourceClass(entry.source)">
+                    {{ getSourceLabel(entry.source) }}
+                  </span>
+                </td>
+              </tr>
+            </template>
+            
+            <!-- Message si pas de détails -->
+            <template v-if="openCategory === type && costsByType[type]?.entries.length === 0">
+              <tr class="detail-empty-row">
+                <td colspan="5" class="detail-empty">
+                  Aucun détail disponible pour cette catégorie
+                </td>
               </tr>
             </template>
           </template>
@@ -290,22 +347,22 @@ onMounted(load)
         <tfoot>
           <tr class="total-row">
             <td class="col-type"><strong>Total général</strong></td>
-              <td class="col-amount"><strong>{{ formatCurrency(totals.glpi) }} </strong></td>
-            <td class="col-amount"><strong>{{ formatCurrency(totals.super) }} </strong></td>
-            <td class="col-amount"><strong>{{ formatCurrency(totals.reopen) }} </strong></td>
-            <td class="col-total"><strong>{{ formatCurrency(totals.total) }} </strong></td>
-          </tr>
+            <td class="col-amount"><strong>{{ formatCurrency(totals.glpi) }}</strong></td>
+            <td class="col-amount"><strong>{{ formatCurrency(totals.super) }}</strong></td>
+            <td class="col-amount"><strong>{{ formatCurrency(totals.reopen) }}</strong></td>
+            <td class="col-total"><strong>{{ formatCurrency(totals.total) }}</strong></td>
+           </tr>
           <tr class="tickets-row">
             <td class="col-type"><em>Nombre de tickets</em></td>
             <td colspan="4" class="col-tickets">{{ totals.ticketCount }} ticket(s)</td>
-          </tr>
+           </tr>
         </tfoot>
-      </table>
+       </table>
     </div>
 
     <!-- État vide -->
     <div v-if="!loading && totals.total === 0 && !error" class="empty-module">
-      <div class="empty-icon"></div>
+      <div class="empty-icon">📊</div>
       <h2>Aucun coût enregistré</h2>
       <p>Les coûts apparaissent après un import CSV ou lors de la fermeture d'un ticket Kanban.</p>
     </div>
@@ -315,9 +372,6 @@ onMounted(load)
 <style scoped>
 @import '@/styles/module.css';
 
-/* ============================================
-   TABLEAU DES COÛTS
-   ============================================ */
 .table-container {
   background: white;
   border-radius: 12px;
@@ -352,8 +406,18 @@ onMounted(load)
   vertical-align: middle;
 }
 
-.cost-table tr:last-child td {
+.cost-table tbody tr:last-child td {
   border-bottom: none;
+}
+
+/* Lignes cliquables */
+.clickable-row {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.clickable-row:hover {
+  background: #f8fafc;
 }
 
 /* Colonnes */
@@ -376,7 +440,19 @@ onMounted(load)
   color: #0f172a;
 }
 
-/* Montants */
+/* Badge nombre de tickets */
+.ticket-count-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.125rem 0.5rem;
+  background: #e2e8f0;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+/* Montants principaux */
 .amount {
   font-family: monospace;
   font-size: 0.85rem;
@@ -394,6 +470,95 @@ onMounted(load)
 .amount.reopen {
   color: #ef4444;
   font-weight: 500;
+}
+
+/* En-tête des détails */
+.detail-header-row {
+  background: #f1f5f9;
+}
+
+.detail-header {
+  padding: 0.5rem 1rem !important;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* Lignes de détail */
+.detail-row {
+  background: #fafbfc;
+}
+
+.detail-row:hover {
+  background: #f8fafc;
+}
+
+.detail-col-type {
+  padding-left: 2rem !important;
+}
+
+.detail-ticket-id {
+  font-family: monospace;
+  font-weight: 600;
+  color: #3b82f6;
+  margin-right: 0.75rem;
+}
+
+.detail-ticket-title {
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.detail-amount {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: #334155;
+}
+
+.detail-amount.super {
+  color: #8b5cf6;
+}
+
+.detail-amount.reopen {
+  color: #ef4444;
+}
+
+/* Badges de source */
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+
+.badge-glpi {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge-kanban {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.badge-reopen {
+  background: #fecaca;
+  color: #991b1b;
+}
+
+/* Ligne vide */
+.detail-empty-row {
+  background: #fafbfc;
+}
+
+.detail-empty {
+  text-align: center !important;
+  padding: 1rem !important;
+  color: #94a3b8;
+  font-size: 0.75rem;
 }
 
 /* Type icon */
@@ -482,6 +647,16 @@ onMounted(load)
   
   .col-amount {
     min-width: 100px;
+  }
+  
+  .detail-col-type {
+    padding-left: 1rem !important;
+  }
+  
+  .detail-ticket-title {
+    display: block;
+    margin-left: 2rem;
+    font-size: 0.7rem;
   }
 }
 </style>
