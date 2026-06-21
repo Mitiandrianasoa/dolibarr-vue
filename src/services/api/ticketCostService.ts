@@ -46,9 +46,23 @@ export async function getAllTicketCosts(): Promise<TicketCostRecord[]> {
   return res.data
 }
 
+export async function getAllTicketCostsByIdTicket(ticketId: number): Promise<TicketCostRecord[]> {
+  const res = await axios.get<TicketCostRecord[]>(`${BASE}/ticket/${ticketId}`)
+  return res.data
+}
+
 export async function getLatestTicketCost(ticketId: number): Promise<TicketCostRecord | null> {
   try {
     const res = await axios.get<TicketCostRecord>(`${BASE}/ticket/${ticketId}/latest`)
+    return res.data
+  } catch {
+    return null
+  }
+}
+
+export async function getFirstTicketCost(ticketId: number): Promise<TicketCostRecord | null> {
+  try {
+    const res = await axios.get<TicketCostRecord>(`${BASE}/ticket/${ticketId}/first`)
     return res.data
   } catch {
     return null

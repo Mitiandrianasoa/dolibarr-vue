@@ -169,8 +169,8 @@ function getSourceClass(source: string): string {
 
 function formatCurrency(n: number): string {
   return new Intl.NumberFormat('fr-FR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
   }).format(n)
 }
 

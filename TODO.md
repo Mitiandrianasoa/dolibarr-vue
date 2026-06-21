@@ -63,10 +63,17 @@ Select-Object LastWriteTime, FullName
   - ajout section cost reoverture 
 
 # REAL LIGNE DE COMMADE QUI MARCHE POUR NOUS 
-Get-ChildItem "D:\S6\EVAL\EVAL 2\gpli-vue" -Recurse |
-Where-Object {$_.LastWriteTime -gt (Get-Date).AddMinutes(-30)} |
+Get-ChildItem "D:\S6\EVAL\EVAL 2\GLP-16-06\gpli-backend - Test"
+Where-Object {$_.LastWriteTime -gt (Get-Date).AddMinutes(-90)}|
 Sort-Object LastWriteTime -Descending |
 Select-Object LastWriteTime, FullName
+
+Get-ChildItem "D:\S6\EVAL\EVAL 2\GLP-16-06"
+Where-Object {$_.LastWriteTime -gt (Get-Date).AddMinutes(-90)}|
+Sort-Object LastWriteTime -Descending |
+Select-Object LastWriteTime, FullName
+
+
 
 # ALEA 3 
 - nouvelle page import: import mouvement 
@@ -84,8 +91,7 @@ Select-Object LastWriteTime, FullName
           - items/assets + cout
 
 
-# ALEA 4:
-
+# ALEA SCENARIO:
 Ticket 1 
 terminer 100
 reouverture 5
@@ -95,5 +101,23 @@ Ticket 2
 reouverture 10
 terminer 100
 
+ETU003145
 
+
+# ALEA 4:
+CALCUL REOUVERTURE: %VALEUR de reouverture 
+	- MODE 1: DERNIER SUPERCOUT
+	- MODE 2: PREMIER SUPERCOUT
+	- MODE 3: MOYENNE DES SUPERCOUTS 
+	- MODE 4: SOMME DES SUPERCOUTS 
+	
+IMPORT MVT:
+- (OK) NOUVELLE COLONNE:
+	- mode 
+	- uniquement valide pour le mvt open
+
+front:
+ - dialogue de reouverture:  
+	- ZONE DE LISTE [1,2,3,4] dans l'import pour chaque ligne.
+appel function/ version avec idTicket
 

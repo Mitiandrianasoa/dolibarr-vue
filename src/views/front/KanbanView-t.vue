@@ -1,53 +1,22 @@
-<!-- 
-═══════════════════════════════════════════════════════════════════════════════
-  KANBANVIEW.VUE - TABLEAU KANBAN
-  ═══════════════════════════════════════════════════════════════════════════════
-  
-  FONCTIONNALITÉS :
-  ┌─────────────────────────────────────────────────────────────────────────┐
-  │  1. AFFICHAGE DES TICKETS EN 3 COLONNES (Nouveau, En cours, Terminé)  │
-  │  2. DRAG & DROP POUR CHANGER LE STATUT DES TICKETS                    │
-  │  3. DIALOGUE DE FERMETURE (→ Terminé) avec saisie coût                │
-  │  4. DIALOGUE DE RÉOUVERTURE (Terminé → En cours) avec 4 modes de calc │
-  │  5. MODAL DÉTAIL DU TICKET                                             │
-  └─────────────────────────────────────────────────────────────────────────┘
-═══════════════════════════════════════════════════════════════════════════════ 
--->
-
 <script setup lang="ts">
-// ═══════════════════════════════════════════════════════════════════════════════
-//  IMPORTS
-// ═══════════════════════════════════════════════════════════════════════════════
-import { ref, onMounted } from 'vue'
+import { ref,onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { fetchAllTickets, fetchTicketItems } from '@/services/api/ticketService'
 import { glpiClient } from '@/services/api/glpiClient'
 import { getKanbanSettings, type KanbanSetting } from '@/services/api/kanbanSettingsService'
-import { 
-  saveTicketCost, 
-  getLatestTicketCost, 
-  deleteLatestTicketCost, 
-  getAllTicketCostsByIdTicket 
-} from '@/services/api/ticketCostService'
+import { saveTicketCost, getLatestTicketCost, deleteLatestTicketCost, getAllTicketCostsByIdTicket } from '@/services/api/ticketCostService'
 import type { Ticket, TicketStatus } from '@/models/Ticket'
 import { processTicketCost } from '@/services/cost/ticketCostProcessor'
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  ROUTER & ÉTAT GLOBAL
-// ═══════════════════════════════════════════════════════════════════════════════
 const router = useRouter()
-
-// --- État des tickets ---
 const loading = ref(true)
 const loadError = ref('')
 const allTickets = ref<Ticket[]>([])
 
-// --- Langue (FR / MG) ---
+// ── Langue ─────────────────────────────────────────────────────
 const currentLang = ref<'fr' | 'mg'>('fr')
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  PARTIE 1 : PARAMÈTRES KANBAN (Couleurs et labels personnalisés)
-// ═══════════════════════════════════════════════════════════════════════════════
+// ── Paramètres Kanban ─────────────────────────────────────────
 const colSettings = ref<Record<string, KanbanSetting>>({})
 
 async function loadSettings() {
@@ -72,32 +41,48 @@ function colLabelMg(colId: string): string {
   return colSettings.value[colId]?.labelMg ?? fallback[colId] ?? colId
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  PARTIE 2 : CONFIGURATION DES COLONNES KANBAN
-// ═══════════════════════════════════════════════════════════════════════════════
-const COLUMNS = [
-  { id: 'new',      label: 'Nouveau',   statuses: [1], targetStatus: 1, defaultColor: '#dbeafe', needsDialog: false },
-  { id: 'progress', label: 'En cours',  statuses: [2], targetStatus: 2, defaultColor: '#ffedd5', needsDialog: false },
-  { id: 'done',     label: 'Terminé',   statuses: [6], targetStatus: 6, defaultColor: '#dcfce7', needsDialog: true },
-] as const
-
-type ColumnId = typeof COLUMNS[number]['id']
-
 function getColumnLabel(col: typeof COLUMNS[number]): string {
   if (currentLang.value === 'mg') {
-    return colSettings.value[col.id]?.labelMg ?? 
-      ({ new: 'Vaovao', progress: 'Efa manao', done: 'Vita' }[col.id] ?? col.id)
+    return colLabelMg(col.id)
   }
   return col.label
 }
+
+// ── Colonnes Kanban ─────────────────────────────────────────────
+const COLUMNS = [
+  {
+    id: 'new',
+    label: 'Nouveau',
+    statuses: [1] as number[],
+    targetStatus: 1,
+    defaultColor: '#dbeafe',
+    needsDialog: false,
+  },
+  {
+    id: 'progress',
+    label: 'En cours',
+    statuses: [2] as number[],
+    targetStatus: 2,
+    defaultColor: '#ffedd5',
+    needsDialog: false,
+  },
+  {
+    id: 'done',
+    label: 'Terminé',
+    statuses: [6] as number[],
+    targetStatus: 6,
+    defaultColor: '#dcfce7',
+    needsDialog: true,
+  },
+] as const
+
+type ColumnId = typeof COLUMNS[number]['id']
 
 function colTickets(col: typeof COLUMNS[number]) {
   return allTickets.value.filter(t => (col.statuses as number[]).includes(t.status))
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  PARTIE 3 : CHARGEMENT DES DONNÉES
-// ═══════════════════════════════════════════════════════════════════════════════
+// ── Chargement ──────────────────────────────────────────────────
 async function load() {
   loading.value = true
   loadError.value = ''
@@ -110,9 +95,7 @@ async function load() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  PARTIE 4 : DRAG & DROP
-// ═══════════════════════════════════════════════════════════════════════════════
+// ── Drag & Drop ─────────────────────────────────────────────────
 const dragging = ref<Ticket | null>(null)
 const draggingFromCol = ref<ColumnId | null>(null)
 const dragOverCol = ref<ColumnId | null>(null)
@@ -140,40 +123,33 @@ function onDragLeave() {
 function onDrop(e: DragEvent, col: typeof COLUMNS[number]) {
   e.preventDefault()
   dragOverCol.value = null
-  
   if (!dragging.value || draggingFromCol.value === col.id) {
     dragging.value = null
     return
   }
-  
   const ticket = dragging.value
   const fromCol = draggingFromCol.value
   dragging.value = null
 
-  // 🎯 RÈGLES DE DÉPLACEMENT :
-  // ┌─────────────────────────────────────────────────────────────────────────┐
-  // │  Terminé → En cours  →  openReopenDialog()  →  Saisie % + Mode       │
-  // │  Vers Terminé        →  openCloseDialog()   →  Saisie coût           │
-  // │  Autres mouvements   →  applyStatusChange() →  Changement direct     │
-  // └─────────────────────────────────────────────────────────────────────────┘
-  
+  // Cas 1: Ticket "Terminé" vers "En cours" → Réouverture
   if (fromCol === 'done' && col.id === 'progress') {
     openReopenDialog(ticket)
-  } else if (col.id === 'done') {
+  }
+  // Cas 2: Vers "Terminé" → Fermeture
+  else if (col.id === 'done') {
     openCloseDialog(ticket)
-  } else {
+  }
+  // Cas 3: Autres mouvements
+  else {
     applyStatusChange(ticket, col.targetStatus)
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  PARTIE 5 : MISE À JOUR DU STATUT (GLPI + UI)
-// ═══════════════════════════════════════════════════════════════════════════════
+// ── Mise à jour statut ──────────────────────────────────────────
 async function applyStatusChange(ticket: Ticket, newStatus: number, note?: string) {
   const idx = allTickets.value.findIndex(t => t.id === ticket.id)
   const prev = idx !== -1 ? { ...allTickets.value[idx] } : null
 
-  // Mise à jour UI optimiste
   if (idx !== -1) {
     allTickets.value[idx] = { ...allTickets.value[idx], status: newStatus as TicketStatus }
   }
@@ -187,15 +163,12 @@ async function applyStatusChange(ticket: Ticket, newStatus: number, note?: strin
       }).catch(() => {})
     }
   } catch (e) {
-    // Rollback en cas d'erreur
     if (prev && idx !== -1) allTickets.value[idx] = prev
     console.error('Erreur mise à jour statut :', e)
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  PARTIE 6 : DIALOGUE DE FERMETURE (→ Terminé)
-//  ═══════════════════════════════════════════════════════════════════════════════
+// ── DIALOG FERMETURE (→ Terminé) ─────────────────────────────────
 const showCloseDialog = ref(false)
 const closeDialogTicket = ref<Ticket | null>(null)
 const resolutionNote = ref('')
@@ -229,10 +202,10 @@ async function confirmCloseDialog() {
   if (!closeDialogTicket.value) return
   const ticket = closeDialogTicket.value
 
-  // 1️⃣ Changer le statut dans GLPI (Fermé = 6)
+  // 1. Changer le statut dans GLPI
   await applyStatusChange(ticket, 6, resolutionNote.value)
 
-  // 2️⃣ Enregistrer le coût dans SQLite si > 0
+  // 2. Enregistrer le coût dans SQLite si renseigné
   const cost = Number(closeDialogCost.value)
   if (cost > 0) {
     const types = closeDialogItems.value.map((i: any) => i.itemtype).filter(Boolean)
@@ -243,7 +216,7 @@ async function confirmCloseDialog() {
         fixedCost: cost,
         itemCount: types.length || 1,
         itemTypes: JSON.stringify(types),
-        source: 'kanban',
+        source: 'kanban',  // ⚠️ 'kanban' (pas 'supercost')
       })
       console.log(`[SQLite] Coût sauvegardé pour ticket #${ticket.id}: ${cost} Ar`)
     } catch (e) {
@@ -255,17 +228,7 @@ async function confirmCloseDialog() {
   closeDialogTicket.value = null
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  PARTIE 7 : DIALOGUE DE RÉOUVERTURE (Terminé → En cours)
-//  ═══════════════════════════════════════════════════════════════════════════════
-//  🎯 4 MODES DE CALCUL :
-//  ┌─────────────────────────────────────────────────────────────────────────┐
-//  │  Mode 1 : Dernier coût    →  Utilise le coût le plus récent          │
-//  │  Mode 2 : Premier coût    →  Utilise le coût le plus ancien          │
-//  │  Mode 3 : Moyenne         →  Moyenne de tous les coûts               │
-//  │  Mode 4 : Somme           →  Somme de tous les coûts                 │
-//  └─────────────────────────────────────────────────────────────────────────┘
-
+// ── DIALOG RÉOUVERTURE (Terminé → En cours) ─────────────────────
 const showReopenDialog = ref(false)
 const reopenDialogTicket = ref<Ticket | null>(null)
 const reopenPercentage = ref<number>(10)
@@ -277,7 +240,14 @@ const reopenDialogItems = ref<any[]>([])
 const reopenMode = ref<1 | 2 | 3 | 4>(1)
 const allTicketCosts = ref<any[]>([])
 
-// --- 7.1 : OUVERTURE DU DIALOGUE ---
+
+// //INTERFACE 
+// interface TicketInfo {
+//   id:    number
+//   title: string
+//   types: string[]
+// }
+
 async function openReopenDialog(ticket: Ticket) {
   reopenDialogTicket.value = ticket
   reopenPercentage.value = 10
@@ -296,11 +266,14 @@ async function openReopenDialog(ticket: Ticket) {
     ])
     
     allTicketCosts.value = allCosts || []
+    
     if (latestCost && latestCost.fixedCost > 0) {
       reopenLastCost.value = latestCost.fixedCost
     }
     
     updateReopenCost()
+    
+    console.log(`[SQLite] Coûts pour ticket #${ticket.id}:`, allTicketCosts.value)
     reopenDialogItems.value = items || []
   } catch (error) {
     console.error('Erreur chargement données:', error)
@@ -318,7 +291,6 @@ function cancelReopenDialog() {
   allTicketCosts.value = []
 }
 
-// --- 7.2 : CALCUL DU COÛT EN TEMPS RÉEL ---
 function updateReopenCost() {
   if (reopenPercentage.value < 0) reopenPercentage.value = 0
   if (reopenPercentage.value > 100) reopenPercentage.value = 100
@@ -330,54 +302,83 @@ function updateReopenCost() {
     return
   }
 
-  switch (reopenMode.value) {
-    case 1: // Dernier coût
+  if (reopenMode.value === 1) {
+    // Mode 1: Dernier coût
+    if (reopenLastCost.value > 0) {
       baseCost = reopenLastCost.value
-      break
-    case 2: // Premier coût
-      baseCost = allTicketCosts.value[0]?.fixedCost || 0
-      break
-    case 3: // Moyenne
-      const validCosts3 = allTicketCosts.value.filter(c => Number(c.fixedCost) > 0)
-      if (validCosts3.length > 0) {
-        baseCost = validCosts3.reduce((s, c) => s + Number(c.fixedCost), 0) / validCosts3.length
-      }
-      break
-    case 4: // Somme
-      baseCost = allTicketCosts.value.reduce((s, c) => s + (Number(c.fixedCost) || 0), 0)
-      break
-  }
-
-  reopenCalculatedCost.value = baseCost > 0 
-    ? Number(((baseCost * reopenPercentage.value) / 100).toFixed(2)) 
-    : 0
-}
-
-// --- 7.3 : AFFICHAGE DES INFOS DANS LE DIALOGUE ---
-function getBaseCostLabel(): string {
-  const labels = {
-    1: 'Dernier coût:',
-    2: 'Premier coût:',
-    3: 'Moyenne des coûts:',
-    4: 'Somme des coûts:'
-  }
-  return labels[reopenMode.value] || 'Base:'
-}
-
-function getBaseCostValue(): number {
-  switch (reopenMode.value) {
-    case 1: return reopenLastCost.value
-    case 2: return allTicketCosts.value[0]?.fixedCost || 0
-    case 3: {
-      const valid = allTicketCosts.value.filter(c => Number(c.fixedCost) > 0)
-      return valid.length > 0 ? valid.reduce((s, c) => s + Number(c.fixedCost), 0) / valid.length : 0
     }
-    case 4: return allTicketCosts.value.reduce((s, c) => s + (Number(c.fixedCost) || 0), 0)
-    default: return 0
+  } else if (reopenMode.value === 2) {
+    // Mode 2: Premier coût
+    const firstCost = allTicketCosts.value[0]
+    if (firstCost && firstCost.fixedCost > 0) {
+      baseCost = firstCost.fixedCost
+    }
+  } else if (reopenMode.value === 3) {
+    // Mode 3: Moyenne des coûts
+    let sum = 0
+    let validCount = 0
+    for (const cost of allTicketCosts.value) {
+      const costValue = Number(cost.fixedCost) || 0
+      if (costValue > 0) {
+        sum += costValue
+        validCount++
+      }
+    }
+    if (validCount > 0) {
+      baseCost = sum / validCount
+    }
+  } else if (reopenMode.value === 4) {
+    // Mode 4: Somme des coûts
+    let sum = 0
+    for (const cost of allTicketCosts.value) {
+      const costValue = Number(cost.fixedCost) || 0
+      if (costValue > 0) {
+        sum += costValue
+      }
+    }
+    baseCost = sum
+  }
+
+  if (baseCost > 0) {
+    reopenCalculatedCost.value = Number(((baseCost * reopenPercentage.value) / 100).toFixed(2))
+  } else {
+    reopenCalculatedCost.value = 0
   }
 }
 
-// --- 7.4 : CONFIRMATION DE LA RÉOUVERTURE ---
+function getBaseCostLabel() {
+  if (reopenMode.value === 1) return 'Dernier coût:'
+  if (reopenMode.value === 2) return 'Premier coût:'
+  if (reopenMode.value === 3) return 'Moyenne des coûts:'
+  return 'Somme des coûts:'
+}
+
+function getBaseCostValue() {
+  let base = 0
+  if (reopenMode.value === 1) {
+    base = reopenLastCost.value
+  } else if (reopenMode.value === 2) {
+    base = allTicketCosts.value[0]?.fixedCost || 0
+  } else if (reopenMode.value === 3) {
+    let sum = 0, count = 0
+    for (const c of allTicketCosts.value) {
+      if (c.fixedCost > 0) {
+        sum += c.fixedCost
+        count++
+      }
+    }
+    base = count > 0 ? sum / count : 0
+  } else if (reopenMode.value === 4) {
+    let sum = 0
+    for (const c of allTicketCosts.value) {
+      if (c.fixedCost > 0) sum += c.fixedCost
+    }
+    base = sum
+  }
+  return base
+}
+
+// Dans confirmReopenDialog
 async function confirmReopenDialog() {
   if (!reopenDialogTicket.value) return
   const ticket = reopenDialogTicket.value
@@ -385,22 +386,21 @@ async function confirmReopenDialog() {
   reopenLoading.value = true
   
   try {
-    // 🔴 Décommente pour mettre à jour le statut dans GLPI
     // await applyStatusChange(ticket, 2)
   
     const types = reopenDialogItems.value.map((i: any) => i.itemtype).filter(Boolean)
-    const result = await processTicketCost(
-      { id: ticket.id, title: ticket.title, types },
-      'open',
-      reopenPercentage.value,
-      Number(reopenMode.value)
-    )
-    
-    if (result.success) {
-      console.log(`[Kanban] ✅ ${result.message}`)
-    } else {
-      console.warn(`[Kanban] ⚠️ ${result.message}`)
-    }
+      const result = await processTicketCost(
+        { id: ticket.id, title: ticket.title, types },
+        'open',
+        reopenPercentage.value,
+        Number(reopenMode.value)
+      )
+      console.log(reopenMode.value)
+      if (result.success) {
+        console.log(`[Kanban] ✅ ${result.message}`)
+      } else {
+        console.warn(`[Kanban] ⚠️ ${result.message}`)
+      }
     
     showReopenDialog.value = false
     reopenDialogTicket.value = null
@@ -414,7 +414,7 @@ async function confirmReopenDialog() {
   }
 }
 
-// --- 7.5 : ANNULATION (supprime le dernier coût) ---
+// Annulation : supprime uniquement le DERNIER coût
 async function confirmCancelTicket() {
   if (!reopenDialogTicket.value) return
   const ticket = reopenDialogTicket.value
@@ -426,12 +426,16 @@ async function confirmCancelTicket() {
   cancelLoading.value = true
   
   try {
+    // Supprime uniquement le dernier coût du ticket dans SQLite
     await deleteLatestTicketCost(ticket.id)
     await applyStatusChange(ticket, 2)
     console.log(`[SQLite] Dernier coût supprimé pour ticket #${ticket.id}`)
+    
     alert(`Ticket #${ticket.id} : dernier coût supprimé.`)
+    
     showReopenDialog.value = false
     reopenDialogTicket.value = null
+    
   } catch (error) {
     console.error('Erreur lors de l\'annulation:', error)
     alert('Erreur lors de l\'annulation du dernier coût')
@@ -440,9 +444,7 @@ async function confirmCancelTicket() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  PARTIE 8 : MODAL DÉTAIL DU TICKET
-// ═══════════════════════════════════════════════════════════════════════════════
+// ── Modal détail ticket ─────────────────────────────────────────
 const selectedTicket = ref<Ticket | null>(null)
 const linkedItems = ref<any[]>([])
 const loadingItems = ref(false)
@@ -459,19 +461,7 @@ async function openDetail(ticket: Ticket) {
 
 function closeDetail() { selectedTicket.value = null }
 
-function editAndClose(ticket: Ticket | null) {
-  if (!ticket) {
-    console.warn('[Kanban] Tentative d\'édition sans ticket sélectionné')
-    return
-  }
-  const ticketId = ticket.id
-  closeDetail()
-  router.push(`/tickets/${ticketId}/edit`)
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  PARTIE 9 : HELPERS D'AFFICHAGE
-// ═══════════════════════════════════════════════════════════════════════════════
+// ── Helpers d'affichage ─────────────────────────────────────────
 const TYPE_META: Record<number, { label: string; color: string }> = {
   1: { label: 'Incident', color: 'red' },
   2: { label: 'Demande', color: 'blue' },
@@ -514,32 +504,25 @@ function relativeDate(d?: string) {
 
 function formatFull(d?: string) {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('fr-FR', { 
-    day: '2-digit', month: 'long', year: 'numeric', 
-    hour: '2-digit', minute: '2-digit' 
-  })
+  return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  LIFECYCLE : CHARGEMENT INITIAL
-// ═══════════════════════════════════════════════════════════════════════════════
-onMounted(() => { 
-  load() 
-  loadSettings() 
-})
+function editAndClose(ticket: Ticket | null) {
+  if (!ticket) {
+    console.warn('[Kanban] Tentative d\'édition sans ticket sélectionné')
+    return
+  }
+  const ticketId = ticket.id
+  closeDetail()
+  router.push(`/tickets/${ticketId}/edit`)
+}
+
+onMounted(() => { load(); loadSettings() })
 </script>
 
 <template>
-  <!-- 
-  ═══════════════════════════════════════════════════════════════════════════════
-    TEMPLATE KANBAN
-  ═══════════════════════════════════════════════════════════════════════════════
-  -->
   <div class="module-view animate-in">
-    
-    <!-- ────────────────────────────────────────────────────────────────────── -->
-    <!--  EN-TÊTE                                                              -->
-    <!-- ────────────────────────────────────────────────────────────────────── -->
+    <!-- En-tête -->
     <div class="mv-header">
       <div class="mv-title-wrap">
         <div class="mv-icon icon-purple">
@@ -574,9 +557,6 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- ────────────────────────────────────────────────────────────────────── -->
-    <!--  ERREUR DE CHARGEMENT                                                  -->
-    <!-- ────────────────────────────────────────────────────────────────────── -->
     <div v-if="loadError" class="alert-error">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
@@ -585,9 +565,7 @@ onMounted(() => {
       <button class="err-retry" @click="load">Réessayer</button>
     </div>
 
-    <!-- ────────────────────────────────────────────────────────────────────── -->
-    <!--  BOARD KANBAN (3 COLONNES)                                            -->
-    <!-- ────────────────────────────────────────────────────────────────────── -->
+    <!-- Board Kanban -->
     <div class="kanban-board">
       <div
         v-for="col in COLUMNS"
@@ -602,15 +580,15 @@ onMounted(() => {
         @dragleave="onDragLeave"
         @drop="onDrop($event, col)"
       >
-        <!-- En-tête de colonne -->
         <div class="col-header">
           <div class="col-title-wrap">
-            <span class="col-title">{{ getColumnLabel(col) }}</span>
+            <div class="col-title-stack">
+              <span class="col-title">{{ getColumnLabel(col) }}</span>
+            </div>
           </div>
           <span class="col-count">{{ colTickets(col).length }}</span>
         </div>
 
-        <!-- Cartes tickets -->
         <div class="col-cards">
           <template v-if="loading">
             <div v-for="n in 2" :key="n" class="card-skeleton"></div>
@@ -655,7 +633,6 @@ onMounted(() => {
           </template>
         </div>
 
-        <!-- Bouton Ajouter (seulement colonne "Nouveau") -->
         <button
           v-if="col.id === 'new'"
           class="col-add-btn"
@@ -669,13 +646,12 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- ══════════════════════════════════════════════════════════════════════ -->
-    <!--  MODAL DÉTAIL TICKET                                                  -->
-    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!-- MODAL DÉTAIL TICKET -->
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="selectedTicket" class="modal-overlay" @click.self="closeDetail">
           <div class="modal-card">
+            <!-- Contenu inchangé -->
             <div class="modal-head">
               <div class="modal-chips">
                 <span class="badge" :class="`badge-${typeMeta(selectedTicket.type).color}`">
@@ -717,24 +693,30 @@ onMounted(() => {
               </div>
             </div>
             <div class="modal-foot">
-              <button class="btn-secondary" @click="closeDetail">{{ currentLang === 'mg' ? 'Hidiana' : 'Fermer' }}</button>
+              <!-- APRÈS (corrigé) -->
               <button class="btn-primary" @click="editAndClose(selectedTicket)">
                 {{ currentLang === 'mg' ? 'Hanova' : 'Modifier' }}
               </button>
+              <button class="btn-secondary" @click="closeDetail">{{ currentLang === 'mg' ? 'Hidiana' : 'Fermer' }}</button>
+              
             </div>
           </div>
         </div>
       </Transition>
     </Teleport>
 
-    <!-- ══════════════════════════════════════════════════════════════════════ -->
-    <!--  DIALOGUE FERMETURE (→ Terminé)                                      -->
-    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!-- DIALOG FERMETURE (→ Terminé) -->
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="showCloseDialog" class="modal-overlay" @click.self="cancelCloseDialog">
           <div class="dialog-card">
-            <div class="dialog-icon"></div>
+            <div class="dialog-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+            </div>
+
             <h3 class="dialog-title">Marquer comme terminé ?</h3>
             <p class="dialog-sub">
               Le ticket <strong>#{{ closeDialogTicket?.id }}</strong> sera marqué comme fermé.
@@ -742,14 +724,30 @@ onMounted(() => {
 
             <div class="dialog-field">
               <label>Note de résolution</label>
-              <textarea v-model="resolutionNote" rows="3" placeholder="Décrivez la solution apportée…"></textarea>
+              <textarea
+                v-model="resolutionNote"
+                rows="3"
+                placeholder="Décrivez la solution apportée…"
+              ></textarea>
             </div>
 
             <div class="dialog-field">
-              <label>Coût fixe (Ar) <span class="field-hint">optionnel</span></label>
+              <label>
+                Coût fixe (Ar)
+                <span class="field-hint">optionnel</span>
+              </label>
+              
               <div class="cost-input-wrap">
-                <span class="cost-prefix">Ar</span>
-                <input v-model="closeDialogCost" type="number" min="0" step="0.01" placeholder="0.00" class="cost-input" />
+                <span class="cost-prefix"></span>
+                <input
+                  v-model="closeDialogCost"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  class="cost-input"
+                />
+                
               </div>
               <p v-if="loadingCloseItems" class="cost-info">Chargement des actifs…</p>
               <p v-else-if="closeDialogItems.length > 1 && closeDialogCost && Number(closeDialogCost) > 0" class="cost-info">
@@ -766,74 +764,105 @@ onMounted(() => {
       </Transition>
     </Teleport>
 
-    <!-- ══════════════════════════════════════════════════════════════════════ -->
-    <!--  DIALOGUE RÉOUVERTURE (Terminé → En cours)                           -->
-    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!-- DIALOG RÉOUVERTURE (Terminé → En cours) -->
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="showReopenDialog" class="modal-overlay" @click.self="cancelReopenDialog">
           <div class="dialog-card">
-            <div class="dialog-icon reopen"></div>
+            <div class="dialog-icon reopen">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="1 4 1 10 7 10"/>
+                <path d="M3.51 15a9 9 0 1 0 .49-4.5"/>
+              </svg>
+            </div>
+
             <h3 class="dialog-title">Rouvrir ce ticket ?</h3>
             <p class="dialog-sub">
-              Le ticket <strong>#{{ reopenDialogTicket?.id }}</strong> sera remis en <strong>En cours</strong>.
+              Le ticket <strong>#{{ reopenDialogTicket?.id }}</strong> sera remis en 
+              <strong>En cours</strong>.
             </p>
 
-            <!-- Section calcul réouverture -->
+            <!-- Section Réouverture avec pourcentage -->
             <div class="reopen-section">
               <div class="section-title"> Réouverture avec pourcentage</div>
               <div class="dialog-field">
                 <label>Pourcentage de réouverture (%)</label>
                 <div class="cost-input-wrap">
-                  <span class="cost-prefix">%</span>
-                  <input
-                    v-model="reopenPercentage"
-                    type="number"
+                <span class="cost-prefix"></span>
+                <input
+                  v-model="reopenPercentage"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  class="cost-input"
+                  @input="updateReopenCost"
+                  :disabled="reopenLoading"
+                />
+                <span class="cost-suffix"> 
+                  <select v-model="reopenMode" class="mode-select" :disabled="reopenLoading">
+                    <option :value="1">Mode 1</option>
+                    <option :value="2">Mode 2</option>
+                    <option :value="3">Mode 3</option>
+                    <option :value="4">Mode 4</option>
+                  </select>
+                </span>
+              </div>
+                <div class="percentage-input-group">
+                  <!-- <input
+                    v-model.number="reopenPercentage"
+                    type="range"
                     min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                    class="cost-input"
+                    max="100"
+                    step="1"
+                    class="percentage-slider"
                     @input="updateReopenCost"
                     :disabled="reopenLoading"
-                  />
-                  <span class="cost-suffix">
-                    <select v-model="reopenMode" class="mode-select" :disabled="reopenLoading">
-                      <option :value="1">Mode 1</option>
-                      <option :value="2">Mode 2</option>
-                      <option :value="3">Mode 3</option>
-                      <option :value="4">Mode 4</option>
-                    </select>
-                  </span>
+                  /> -->
+                  <!-- <div class="percentage-value-input">
+                    <input
+                      v-model.number="reopenPercentage"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      class="percentage-number"
+                      @input="updateReopenCost"
+                      :disabled="reopenLoading"
+                    />
+                    <span class="percentage-symbol">%</span>
+                  </div> -->
                 </div>
                 
                 <div v-if="reopenLoading" class="reopen-info">
-                  <span> Chargement des coûts...</span>
+                  <span>Chargement des coûts...</span>
                 </div>
                 <div v-else-if="allTicketCosts.length > 0" class="reopen-info success">
                   <span>
                     <strong>{{ getBaseCostLabel() }}</strong> {{ getBaseCostValue().toFixed(2) }} Ar
                   </span>
-                  <span class="highlight"> Coût réouverture: {{ reopenCalculatedCost.toFixed(2) }} Ar</span>
+                  <span class="highlight">Coût réouverture: {{ reopenCalculatedCost.toFixed(2) }} Ar</span>
                 </div>
+                
                 <div v-else class="reopen-info warning">
-                  <span>⚠️ Aucun coût précédent - réouverture gratuite</span>
+                  <span> Aucun coût précédent - réouverture gratuite</span>
                 </div>
               </div>
             </div>
 
-            <!-- Séparateur -->
+            <!-- Ligne de séparation -->
             <div class="divider"></div>
 
-            <!-- Section Annulation -->
+            <!-- Section Annulation totale -->
             <div class="cancel-section">
-              <div class="section-title"> Annulation totale</div>
+              <div class="section-title">Annulation totale</div>
               <p class="cancel-warning">
-                 Cette action supprimera <strong>tous les coûts associés</strong> à ce ticket dans SQLite.
+                Cette action supprimera <strong>tous les coûts associés</strong> à ce ticket dans SQLite.
                 Cette opération est <strong>irréversible</strong>.
               </p>
             </div>
 
-            <!-- Boutons -->
+            <!-- Boutons d'action -->
             <div class="dialog-actions three-buttons">
               <button class="btn-secondary" @click="cancelReopenDialog">Fermer</button>
               <button 
@@ -841,14 +870,23 @@ onMounted(() => {
                 @click="confirmCancelTicket" 
                 :disabled="cancelLoading || reopenLoading"
               >
-                 {{ cancelLoading ? 'Annulation...' : 'Annuler tout' }}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+                {{ cancelLoading ? 'Annulation...' : 'Annuler tout' }}
               </button>
               <button 
                 class="btn-primary reopen-btn" 
                 @click="confirmReopenDialog" 
                 :disabled="reopenLoading || cancelLoading"
               >
-                 {{ reopenLoading ? 'Réouverture...' : 'Rouvrir' }}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="1 4 1 10 7 10"/>
+                  <path d="M3.51 15a9 9 0 1 0 .49-4.5"/>
+                </svg>
+                {{ reopenLoading ? 'Réouverture...' : 'Rouvrir' }}
               </button>
             </div>
           </div>
@@ -857,6 +895,7 @@ onMounted(() => {
     </Teleport>
   </div>
 </template>
+
 <style scoped>
 @import '../../styles/KanbanView.css';
 
