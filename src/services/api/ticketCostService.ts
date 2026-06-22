@@ -10,6 +10,8 @@ export interface TicketCostPayload {
   itemCount:   number
   itemTypes:   string        // JSON sérialisé : '["Computer","Monitor"]'
   source:      CostSource
+  mode?:       number        // Mode de calcul (1-4, pour reopen)
+  percentage?: number        // Pourcentage (pour reopen)
 }
 
 export interface TicketCostRecord extends TicketCostPayload {
@@ -37,12 +39,24 @@ export interface CostByType {
 const BASE = '/api/ticket-costs'
 
 export async function saveTicketCost(payload: TicketCostPayload): Promise<TicketCostRecord> {
+  console.log('saveTicketCost: Sending payload:', payload)
   const res = await axios.post<TicketCostRecord>(BASE, payload)
+  console.log('saveTicketCost: Received response:', res.data)
   return res.data
 }
 
 export async function getAllTicketCosts(): Promise<TicketCostRecord[]> {
   const res = await axios.get<TicketCostRecord[]>(BASE)
+  return res.data
+}
+
+export async function getTicketCostById(id: number): Promise<TicketCostRecord> {
+  const res = await axios.get<TicketCostRecord>(`${BASE}/${id}`)
+  return res.data
+}
+
+export async function updateTicketCost(id: number, payload: Partial<TicketCostPayload>): Promise<TicketCostRecord> {
+  const res = await axios.put<TicketCostRecord>(`${BASE}/${id}`, payload)
   return res.data
 }
 

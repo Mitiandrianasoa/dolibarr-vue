@@ -160,6 +160,8 @@ export async function processTicketCost(
         itemCount: info.types.length || 1,
         itemTypes: JSON.stringify(info.types),
         source: 'reopen',
+        mode: mode,
+        percentage: valeur,
       })
 
       await updateTicketStatus(info.id, 2)

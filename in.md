@@ -6,3 +6,4 @@
 - nom de variable simple, pas d'accent, pas d'emoji.
 - ajoute des console.log pour debuger.
 - code simple 
+- ajoute dans un fichier txt les fonctions ajoutees a quelle ligne exactement 

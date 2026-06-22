@@ -111,6 +111,12 @@ const router = createRouter({
           component: () => import('@/views/front/CostReportView.vue'),
           meta: { title: 'Rapport des coûts' },
         },
+        {
+          path: 'super-costs',
+          name: 'front-super-costs',
+          component: () => import('@/views/front/SuperCostsView.vue'),
+          meta: { title: 'Gestion des coûts' },
+        },
       ]
     },
     { path: '/:pathMatch(.*)*', redirect: '/dashboard' },

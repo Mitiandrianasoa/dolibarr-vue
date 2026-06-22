@@ -229,30 +229,38 @@ async function confirmCloseDialog() {
   if (!closeDialogTicket.value) return
   const ticket = closeDialogTicket.value
 
-  // 1️⃣ Changer le statut dans GLPI (Fermé = 6)
-  await applyStatusChange(ticket, 6, resolutionNote.value)
-
-  // 2️⃣ Enregistrer le coût dans SQLite si > 0
+  // 1️⃣ Enregistrer le coût (même 0) et mettre à jour le statut
   const cost = Number(closeDialogCost.value)
-  if (cost > 0) {
-    const types = closeDialogItems.value.map((i: any) => i.itemtype).filter(Boolean)
+  const types = closeDialogItems.value.map((i: any) => i.itemtype).filter(Boolean)
+  try {
+    const result = await processTicketCost(
+      { id: ticket.id, title: ticket.title, types },
+      'closed',
+      cost
+    )
+    if (result.success) {
+      console.log(`[Kanban] ✅ ${result.message}`)
+    } else {
+      console.warn(`[Kanban] ⚠️ ${result.message}`)
+    }
+  } catch (e) {
+    console.warn('[SQLite] Erreur enregistrement coût :', e)
+  }
+
+  // 2️⃣ Ajouter la note de résolution (si présente)
+  if (resolutionNote.value?.trim()) {
     try {
-      await saveTicketCost({
-        ticketId: ticket.id,
-        ticketTitle: ticket.title,
-        fixedCost: cost,
-        itemCount: types.length || 1,
-        itemTypes: JSON.stringify(types),
-        source: 'kanban',
+      await glpiClient.post('/ITILSolution', {
+        input: { items_id: ticket.id, itemtype: 'Ticket', content: resolutionNote.value.trim() },
       })
-      console.log(`[SQLite] Coût sauvegardé pour ticket #${ticket.id}: ${cost} Ar`)
-    } catch (e) {
-      console.warn('[SQLite] Erreur enregistrement coût :', e)
+    } catch {
+      // Ignorer l'erreur, la note n'est pas critique
     }
   }
 
   showCloseDialog.value = false
   closeDialogTicket.value = null
+  await load() // Actualiser la liste des tickets
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
