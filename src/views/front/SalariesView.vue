@@ -94,25 +94,29 @@ const deleteSalary = async (id: number) => {
 }
 
 // ⭐ STATUT AVEC "PARTIELLEMENT PAYÉ"
+// getStatusClass et getStatusLabel suivent EXACTEMENT la même logique (3 états)
+// pour que la couleur affichée corresponde toujours au libellé affiché.
 const getStatusClass = (s: Salary) => {
-  // Si le salaire a des paiements mais pas encore totalement payé
+  // Partiellement payé : au moins un paiement mais reste encore un solde
   if (s.total_paye !== undefined && s.total_paye > 0 && s.reste_a_payer > 0) {
     return 'status-partial'
   }
-  return s.paye ? 'status-paid' : 'status-unpaid'
+  // Dû : aucun paiement et il reste un solde
+  if (s.reste_a_payer > 0) {
+    return 'status-du'
+  }
+  // Payé : plus rien à payer
+  return 'status-paid'
 }
 
 const getStatusLabel = (s: Salary) => {
-  // Si le salaire a des paiements mais pas encore totalement payé
   if (s.total_paye !== undefined && s.total_paye > 0 && s.reste_a_payer > 0) {
     return 'Partiellement payé'
   }
-  if (s.total_paye !== undefined && s.total_paye == 0 && s.reste_a_payer > 0) {
+  if (s.reste_a_payer > 0) {
     return 'Dû'
   }
-  else{
-    return 'Payé'
-  }
+  return 'Payé'
 }
 
 // ─── MOUNTED ─────────────────────────────────────────────────────────────────
@@ -142,6 +146,9 @@ onMounted(loadSalaries)
 .status-paid { background: #dcfce7; color: #16a34a; }
 .status-unpaid { background: #fee2e2; color: #dc2626; }
 .status-partial { background: #fef3c7; color: #d97706; }
+/* "Dû" : style distinct (badge rouge plein avec bordure) pour bien le différencier du partiel */
+.status-du {  background: #fee2e2; color: #dc2626;}
+
 
 .btn-sm { padding: 0.25rem 0.6rem; margin: 0 0.2rem; border: 1px solid #e2e8f0; border-radius: 4px; background: white; cursor: pointer; font-size: 0.75rem; transition: all 0.2s; }
 .btn-sm:hover { background: #f1f5f9; }
