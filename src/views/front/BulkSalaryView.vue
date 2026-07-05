@@ -53,6 +53,14 @@
           <label>Montant *</label>
           <input type="number" step="0.01" min="0" v-model.number="salaryForm.amount" required />
         </div>
+        <div class="form-group">
+          <label>Mode *</label>
+          <select v-model.number="salaryForm.mode">
+            <option :value="0">Jour</option>
+            <option :value="1">Nuit</option>
+            <option :value="2">Jour et nuit</option>
+          </select>
+        </div>
       </div>
       <button
         class="btn-primary"
@@ -135,6 +143,7 @@ const salaryForm = ref({
   datesp: '',
   dateep: '',
   amount: 0,
+  mode: 0,
 })
 
 const canGenerate = computed(() =>

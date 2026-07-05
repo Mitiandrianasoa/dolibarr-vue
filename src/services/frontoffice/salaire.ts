@@ -1,4 +1,5 @@
 import { httpClient } from '@/services/httpClient'
+import { DateUtils } from '../../utils/dateUtils'
 
 export interface Payment {
   id: number
@@ -196,6 +197,16 @@ export class SalaireService {
     }
     
     return results
+  }
+
+  /**
+   * Récupère le montant du salaire d'un employé pour un mois donné ('YYYY-MM')
+   * Utilisé pour calculer le pourcentage d'augmentation à partir du salaire réel du mois en cours
+   */
+  async getSalaireDuMois(employeeId: number, mois: string): Promise<number> {
+    const salaires = await this.getSalaryByEmployee(employeeId)
+    const salaireDuMois = salaires.find(s => DateUtils.getYearMonth(s.datesp) === mois)
+    return salaireDuMois ? salaireDuMois.amount : 0
   }
 }
 

@@ -1,5 +1,7 @@
 import { localHttpClient } from '@/services/localHttpClient'
+import { DateUtils } from '@/utils/dateUtils'
 
+// mode: 0 = jour, 1 = nuit, 2 = jour et nuit
 export interface JourFerie {
   id: number
   dateFerie: string
@@ -7,6 +9,7 @@ export interface JourFerie {
   creeLe?: string
   pourcentage: number
   fixe: number
+  mode: number
 }
 
 export class GestionSqliteService {
@@ -17,6 +20,24 @@ export class GestionSqliteService {
     return await localHttpClient.get<JourFerie[]>('/jours-feries')
   }
 
+    /**
+   * Retourne tous les jours fériés qui tombent entre datesp et dateep (inclus)
+   * - fixe = 1 : on teste le jour/mois du férié pour CHAQUE année couverte par la période
+   * - fixe = 0 : on teste la date exacte (jour+mois+année) du férié
+   */
+  async getJoursFeriesInRange(datesp: string, dateep: string): Promise<JourFerie[]> {
+    const joursFeries = await this.getJoursFeries()
+
+    return joursFeries.filter(jourFerie => {
+      if (jourFerie.fixe === 1) {
+        const ferieDate = DateUtils.parseLocalDate(jourFerie.dateFerie)
+        return DateUtils.isFixedHolidayInRange(ferieDate.getMonth(), ferieDate.getDate(), datesp, dateep)
+      } else {
+        return DateUtils.isInRange(jourFerie.dateFerie, datesp, dateep)
+      }
+    })
+  }
+
   /**
    * Récupère un jour férié par sa date
    * - Si fixe === 1: compare seulement jour et mois (s'applique à toutes les années)
@@ -24,22 +45,21 @@ export class GestionSqliteService {
    */
   async getJourFerieByDate(date: string): Promise<JourFerie | undefined> {
     const joursFeries = await this.getJoursFeries()
-    
-    const dateToCheck = new Date(date)
-    const dayToCheck = dateToCheck.getDate()
-    const monthToCheck = dateToCheck.getMonth()
-    const yearToCheck = dateToCheck.getFullYear()
-    
+
+    const d = DateUtils.parseLocalDate(date)
+    const dayToCheck   = d.getDate()
+    const monthToCheck = d.getMonth()
+    const yearToCheck  = d.getFullYear()
+
     return joursFeries.find(jourFerie => {
-      const jourFerieDate = new Date(jourFerie.dateFerie)
-      const dayMatch = jourFerieDate.getDate() === dayToCheck
-      const monthMatch = jourFerieDate.getMonth() === monthToCheck
-      
+      const f = DateUtils.parseLocalDate(jourFerie.dateFerie)
+      const dayMatch   = f.getDate()     === dayToCheck
+      const monthMatch = f.getMonth()    === monthToCheck
+
       if (jourFerie.fixe === 1) {
         return dayMatch && monthMatch
       } else {
-        const yearMatch = jourFerieDate.getFullYear() === yearToCheck
-        return dayMatch && monthMatch && yearMatch
+        return dayMatch && monthMatch && f.getFullYear() === yearToCheck
       }
     })
   }
@@ -47,14 +67,14 @@ export class GestionSqliteService {
   /**
    * Crée un nouveau jour férié
    */
-  async createJourFerie(payload: { dateFerie: string, libelle: string, pourcentage: number, fixe: number }): Promise<any> {
+  async createJourFerie(payload: { dateFerie: string, libelle: string, pourcentage: number, fixe: number, mode: number }): Promise<any> {
     return await localHttpClient.post('/jours-feries', payload)
   }
 
   /**
    * Met à jour un jour férié existant
    */
-  async updateJourFerie(id: number, payload: { dateFerie: string, libelle: string, pourcentage: number, fixe: number }): Promise<any> {
+  async updateJourFerie(id: number, payload: { dateFerie: string, libelle: string, pourcentage: number, fixe: number, mode: number }): Promise<any> {
     return await localHttpClient.put(`/jours-feries/${id}`, payload)
   }
 
