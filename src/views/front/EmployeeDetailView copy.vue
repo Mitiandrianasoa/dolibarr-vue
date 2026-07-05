@@ -36,38 +36,19 @@
         </div>
       </div>
 
-      <div class="card payment-card">
-        <h3>Paiement groupé</h3>
-        <div class="payment-row">
-          <input type="number" step="0.01" min="0" v-model.number="montantAPayer" placeholder="Montant à répartir" />
-          <button class="btn-primary" :disabled="!canPayerGroupe" @click="payerGroupe">
-            {{ paying ? 'Paiement...' : 'Payer' }}
-          </button>
-        </div>
-        <p class="payment-hint">Sélectionne un ou plusieurs salaires ci-dessous : le montant sera réparti en priorité sur les salaires normaux (du plus petit reste au plus grand), puis sur les primes/heures sup.</p>
-      </div>
-
       <div class="card">
         <h3>Historique des salaires et paiements</h3>
         <div v-if="salaries.length === 0" class="empty">Aucun salaire enregistré</div>
         <div v-else class="salary-list">
           <div v-for="salary in salaries" :key="salary.id" class="salary-block">
-            <div class="salary-header">
-              <input
-                type="checkbox"
-                class="salary-checkbox"
-                :value="salary.id"
-                v-model="selectedSalaryIds"
-                :disabled="salary.reste_a_payer <= 0"
-                @click.stop
-              />
-              <div class="salary-header-info" @click="redirectToSalary(salary.id)">
+            <div class="salary-header" @click="redirectToSalary(salary.id)">
+              <div>
                 <strong>{{ salary.label }}</strong>
                 <div class="salary-period">
                   {{ formatTimestamp(salary.datesp) }} → {{ formatTimestamp(salary.dateep) }}
                 </div>
               </div>
-              <div class="salary-amounts" @click="redirectToSalary(salary.id)">
+              <div class="salary-amounts">
                 <span>{{ salary.amount.toFixed(2) }} €</span>
                 <span class="reste-label">Reste: {{ salary.reste_a_payer.toFixed(2) }} €</span>
               </div>
@@ -107,18 +88,14 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { employeeService, type Employee } from '@/services/frontoffice/employee'
 import { salaireService, type Salary } from '@/services/frontoffice/salaire'
-import { bulkService } from '@/services/frontoffice/bulk'
 import { DateUtils } from '@/utils/dateUtils'
 
 const route = useRoute()
-const router = useRouter()
+const router = useRouter() 
 const employeeId = parseInt(route.params.id as string)
 const loading = ref(true)
 const employee = ref<Employee | null>(null)
 const salaries = ref<Salary[]>([])
-const selectedSalaryIds = ref<number[]>([])
-const montantAPayer = ref<number | null>(null)
-const paying = ref(false)
 
 const totalResteAPayer = computed(() =>
   salaries.value.reduce((sum, salary) => sum + salary.reste_a_payer, 0)
@@ -135,27 +112,6 @@ const totalSalaire = computed(() =>
 const formatTimestamp = (timestamp: number) => DateUtils.toDisplayFormat(timestamp)
 
 const formatPaymentDate = (datep: string | number) => DateUtils.toDisplayFormat(datep)
-
-const canPayerGroupe = computed(() =>
-  !paying.value && selectedSalaryIds.value.length > 0 && !!montantAPayer.value && montantAPayer.value > 0
-)
-
-const payerGroupe = async () => {
-  if (!canPayerGroupe.value || !montantAPayer.value) return
-  paying.value = true
-  try {
-    const resultats = await bulkService.BulkPayment(selectedSalaryIds.value, montantAPayer.value)
-    const total = resultats.filter(r => r.success).length
-    alert(`${total} salaire(s) mis à jour avec le paiement.`)
-    selectedSalaryIds.value = []
-    montantAPayer.value = null
-    salaries.value = await salaireService.getSalaryByEmployee(employeeId)
-  } catch (e: any) {
-    alert('Erreur: ' + e.message)
-  } finally {
-    paying.value = false
-  }
-}
 
 onMounted(async () => {
   loading.value = true
@@ -182,15 +138,7 @@ onMounted(async () => {
 .summary-item { display: flex; justify-content: space-between; align-items: center; }
 .reste { color: #dc2626; font-size: 1.5rem; }
 .salary-block { border: 1px solid #e2e8f0; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
-.salary-header { display: flex; align-items: flex-start; gap: 1rem; margin-bottom: 0.75rem; }
-.salary-header-info { flex: 1; cursor: pointer; }
-.salary-checkbox { margin-top: 0.25rem; width: 18px; height: 18px; flex-shrink: 0; }
-.payment-card { background: #f0fdf4; }
-.payment-row { display: flex; gap: 0.75rem; align-items: center; }
-.payment-row input { flex: 1; padding: 0.6rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px; }
-.payment-hint { font-size: 0.8rem; color: #64748b; margin: 0.75rem 0 0; }
-.btn-primary { padding: 0.6rem 1.5rem; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; }
-.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.salary-header { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 0.75rem; }
 .salary-period { font-size: 0.8rem; color: #64748b; margin-top: 0.25rem; }
 .salary-amounts { text-align: right; }
 .reste-label { display: block; font-size: 0.8rem; color: #dc2626; margin-top: 0.25rem; }

@@ -1,5 +1,5 @@
 import { employeeService, type Employee } from './employee'
-import { salaireService } from './salaire'
+import { salaireService, type Salary } from './salaire'
 import { gestionSqliteService } from '../backoffice/gestionSqlite'
 import { DateUtils } from '../../utils/dateUtils'
 
@@ -230,6 +230,58 @@ export class BulkService {
 
     return results
   }
+
+  /**
+   * Répartit un montant unique sur plusieurs salaires sélectionnés.
+   * Priorité : salaires normaux (label "Salaire ...") d'abord, triés par date de début ASC (le plus ancien payé en premier),
+   * puis les primes/heures sup ensuite (même tri par date). On paie chaque ligne jusqu'à épuisement du montant.
+   */
+  async BulkPayment(listSalaire: number[], montant: number): Promise<BulkSalaryResult[]> {
+    const results: BulkSalaryResult[] = []
+
+    const details = await Promise.all(listSalaire.map(id => salaireService.getSalary(id)))
+    const aPayer = details.filter((s): s is Salary => s !== null && s.reste_a_payer > 0)
+
+    const isSalaireNormal = (s: Salary) => s.label.startsWith('Salaire ')
+    const tries = [...aPayer].sort((a, b) => {
+      const prioriteA = isSalaireNormal(a) ? 0 : 1
+      const prioriteB = isSalaireNormal(b) ? 0 : 1
+      if (prioriteA !== prioriteB) return prioriteA - prioriteB
+      // datesp est un timestamp Dolibarr (secondes) : comparaison numérique directe, pas de parsing de date nécessaire
+      return Number(a.datesp) - Number(b.datesp)
+    })
+
+    let restant = montant
+    const today = DateUtils.todayAsInput()
+
+    for (const salaire of tries) {
+      if (restant <= 0) break
+      const montantPaye = Math.min(restant, salaire.reste_a_payer)
+      if (montantPaye <= 0) continue
+
+      try {
+        await salaireService.createPayment(salaire.id, { datep: today, amount: montantPaye })
+        restant -= montantPaye
+        results.push({
+          employeeId: salaire.id,
+          employeeName: salaire.label,
+          success: true,
+          message: `Payé ${montantPaye.toFixed(2)} €`
+        })
+      } catch (error: any) {
+        results.push({
+          employeeId: salaire.id,
+          employeeName: salaire.label,
+          success: false,
+          message: error.message || 'Erreur lors du paiement'
+        })
+      }
+    }
+
+    return results
+  }
+
+
 }
 
 export const bulkService = new BulkService()

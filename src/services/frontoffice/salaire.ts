@@ -208,6 +208,9 @@ export class SalaireService {
     const salaireDuMois = salaires.find(s => DateUtils.getYearMonth(s.datesp) === mois)
     return salaireDuMois ? salaireDuMois.amount : 0
   }
+
+
+  
 }
 
 export const salaireService = new SalaireService()
