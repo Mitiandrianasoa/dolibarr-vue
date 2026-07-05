@@ -200,17 +200,22 @@ export class SalaireService {
   }
 
   /**
-   * Récupère le montant du salaire d'un employé pour un mois donné ('YYYY-MM')
-   * Utilisé pour calculer le pourcentage d'augmentation à partir du salaire réel du mois en cours
+   * Récupère le TOTAL des salaires d'un employé pour un mois donné ('YYYY-MM').
+   * Il peut y avoir plusieurs salaires pour le même mois (salaire de base + heures sup, primes...),
+   * donc on additionne tout, on ne prend pas juste le premier trouvé.
+   * Utilisé pour calculer le pourcentage d'augmentation à partir du salaire réel du mois en cours.
    */
   async getSalaireDuMois(employeeId: number, mois: string): Promise<number> {
     const salaires = await this.getSalaryByEmployee(employeeId)
-    const salaireDuMois = salaires.find(s => DateUtils.getYearMonth(s.datesp) === mois)
-    return salaireDuMois ? salaireDuMois.amount : 0
+    const total = salaires
+      .filter(s => DateUtils.getYearMonth(s.datesp) === mois)
+      .reduce((sum, s) => sum + s.amount, 0)
+    console.log(`Total salaire du mois ${mois} pour l'employé ${employeeId}:`, total)
+    return total
   }
 
 
-  
+
 }
 
 export const salaireService = new SalaireService()

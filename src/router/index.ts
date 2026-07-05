@@ -41,6 +41,12 @@ const router = createRouter({
           component: () => import('@/views/back/ResetView.vue'),
           meta: { title: 'Réinitialiser' },
         },
+        {
+          path: 'import-feries',
+          name: 'import-feries',
+          component: () => import('@/views/back/ImportJoursFeriesView.vue'),
+          meta: { title: 'Import Jours Fériés' },
+        },
       ],
     },
 

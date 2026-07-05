@@ -58,10 +58,6 @@ export class BulkService {
     payload: { datesp: string, dateep: string, amount: number, mode: number}
   ): Promise<BulkSalaryResult[]> {
     const results: BulkSalaryResult[] = []
-    // payload.datesp est une chaîne 'YYYY-MM-DD' (input date), pas un timestamp Dolibarr :
-    // DateUtils.getYearMonth ferait un parseInt('2026-07-01') = 2026 et casserait le calcul,
-    // il faut la variante "input" dédiée aux strings de formulaire.
-    const moisCourant = DateUtils.getYearMonthFromInput(payload.datesp)
 
     for (const employee of employees) {
       try {
@@ -92,7 +88,11 @@ export class BulkService {
 
       if (feriesApplicables.length > 0) {
 
-        // Relire le montant réel du salaire du mois qu'on vient de créer
+        // Total de TOUS les salaires du mois pour cet employé (salaire de base + heures sup/primes
+        // déjà existantes ce mois-ci, y compris celui qu'on vient de créer juste au-dessus).
+        // getSalaireDuMois fait maintenant un vrai total (.reduce), plus un simple .find() qui ne
+        // remontait que le premier enregistrement trouvé.
+        const moisCourant = DateUtils.getYearMonthFromInput(payload.datesp);
         const salaireMoisCourant = await salaireService.getSalaireDuMois(employee.id, moisCourant);
         console.log(`Salaire du mois courant pour ${employeeName}: ${salaireMoisCourant}`);
         // const datespMoisSuivant = DateUtils.getNextMonth(payload.datesp);
@@ -110,26 +110,32 @@ export class BulkService {
               datesp: payload.datesp,
               dateep: payload.dateep
             });
+            console.log(`salaire du mois courant: ${salaireMoisCourant} * pourcentage du jour férié: ${ferie.pourcentage} / 100 = ${salaireMoisCourant * (ferie.pourcentage / 100)}`);
+            console.log(`Prime jour férié pour ${employeeName}: montant = ${salaireMoisCourant * (ferie.pourcentage / 100)}`);
           }
           //NUIT X 2
           if(payload.mode == 1){
             await salaireService.createSalary({
               fk_user: employee.id,
               label: `Prime jour férié (${ferie.libelle}) - ${label} - mode nuit`,
-              amount: (salaireMoisCourant * (ferie.pourcentage / 100)) * 2,
+              amount: (salaireMoisCourant * (ferie.pourcentage / 100)) + 10,
               datesp: payload.datesp,
               dateep: payload.dateep
             });
+            console.log(`salaire du mois courant: ${salaireMoisCourant} * pourcentage du jour férié: ${ferie.pourcentage} / 100 + 10 = ${salaireMoisCourant * (ferie.pourcentage / 100) + 10}`);
+            console.log(`Prime jour férié pour ${employeeName}: montant = ${salaireMoisCourant * (ferie.pourcentage / 100) + 10}`);
           }
           //NUIT ET JOUR
           if(payload.mode == 2){
              await salaireService.createSalary({
               fk_user: employee.id,
               label: `Prime jour férié (${ferie.libelle}) - ${label}- mode jour et nuit`,
-              amount: salaireMoisCourant * 2,
+              amount:  (salaireMoisCourant * (ferie.pourcentage / 100)) + 20,
               datesp: payload.datesp,
               dateep: payload.dateep
             });
+            console.log(`salaire du mois courant: ${salaireMoisCourant} * pourcentage du jour férié: ${ferie.pourcentage} / 100 + 20 = ${salaireMoisCourant * (ferie.pourcentage / 100) + 20}`);
+            console.log(`Prime jour férié pour ${employeeName}: montant = ${salaireMoisCourant * (ferie.pourcentage / 100) + 20}`);
           }
         }
 
@@ -258,7 +264,7 @@ export class BulkService {
       if (restant <= 0) break
       const montantPaye = Math.min(restant, salaire.reste_a_payer)
       if (montantPaye <= 0) continue
-
+      console.log(`Paiement pour ${salaire.employee_name}: montant à payer = ${montantPaye}, restant = ${restant}`)
       try {
         await salaireService.createPayment(salaire.id, { datep: today, amount: montantPaye })
         restant -= montantPaye

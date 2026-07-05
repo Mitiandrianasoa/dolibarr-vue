@@ -30,8 +30,8 @@
             <td>{{ formatDate(item.dateFerie) }}</td>
             <td>{{ item.libelle }}</td>
             <td>{{ item.pourcentage }}%</td>
-            <td>{{ item.fixe }}</td>
-            <td>{{ formatMode(item.mode) }}</td>
+            <td  >{{ item.fixe }}</td>
+            <!-- <td>{{ formatMode(item.mode) }}</td> -->
             <td class="actions">
               <button class="btn-sm" @click="openEdit(item)">Modifier</button>
               <button class="btn-sm btn-delete" @click="removeItem(item.id)">Supprimer</button>
