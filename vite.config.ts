@@ -1,3 +1,4 @@
+// vite.config.ts
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
@@ -6,31 +7,29 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
-      // permet d'utiliser @/models, @/services, @/constants, etc.
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
   server: {
     port: 5173,
-    // Proxy pour éviter les CORS avec GLPI en dev
     proxy: {
-      '/apirest.php': {
-        target: 'http://localhost:8080',
+      '/local-api': {
+        target: 'http://localhost:8000/api',
         changeOrigin: true,
-        secure: false,
+        rewrite: (path) => path.replace(/^\/local-api/, ''),
       },
-      // Proxy pour les photos d'actifs GLPI (picture_front)
-      '/front/document.send.php': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        secure: false,
-      },
-      // Proxy vers le backend Spring Boot (SQLite)
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost/dolibarr-23.0.3/htdocs/api/index.php',
         changeOrigin: true,
-        secure: false,
-      },
-    },
-  },
+        rewrite: (path) => path.replace(/^\/api/, ''),
+        // ⭐ Ajouter ces options pour éviter les problèmes
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            // Supprimer l'encodage pour éviter les problèmes de compression
+            proxyReq.removeHeader('Accept-Encoding')
+          })
+        }
+      }
+    }
+  }
 })

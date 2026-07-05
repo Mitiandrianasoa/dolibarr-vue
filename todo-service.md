@@ -1,0 +1,32 @@
+- services: 
+    - backoffice:
+        - reinitialisation:
+            - user
+            - salaire/payements
+            - donnees sqlite: jour ferie,...
+
+        - import:
+            - user
+            - salaire
+            - photos: qui ne marche pas encore
+        - gestion sqlite donnees [CRUD]:
+            - jour ferie  
+            - ... (autre possible)
+        - dashboard:
+            - GetSalaryByGender(): liste des salaire par genre
+            - GetPaymentByGender(): liste des salaires payer(payement) par genre
+            - CountByGender(): nombre d'employers par genre
+            - GetPaymentPerMonth(): liste de salaire payer par mois (payement), (date de reglement comme reference)
+    - front office:
+        - employee:
+            - getAllEmployee(): liste des employees
+        - salaire:
+            - CRUD salaire:
+                - delete, get, Update, create salary  
+            - CRUD payements:
+                - delete, get, Update, create payment
+            - getPaymentBySalaire: liste des payements d'une salaire
+            - getSalaryByEmployee: liste de salaire d'un employee
+            - getRestePayer(salary): le montant “reste à payer” d'un salaire
+        - Bulk[creation de salaire pour plusieur employee en meme temps]:
+            - createBulkSalary(Liste employees)

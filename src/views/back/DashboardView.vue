@@ -1,196 +1,203 @@
+<!-- src/views/back/DashboardView.vue -->
 <template>
   <div class="dashboard">
     <!-- Header -->
     <div class="dash-header animate-in">
       <div>
-        <h1 class="dash-title">Tableau de bord</h1>
-        <p class="dash-subtitle">Vue d'ensemble de votre infrastructure GLPI</p>
+        <h1 class="dash-title">Tableau de bord des salaires</h1>
+        <p class="dash-subtitle">Analyse des salaires et paiements</p>
       </div>
       <button class="btn-primary" @click="refreshAll" :disabled="loading">
         <svg v-if="loading" class="spin-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
         </svg>
-        <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <polyline points="23 4 23 10 17 10"/>
-          <polyline points="1 20 1 14 7 14"/>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-        </svg>
         {{ loading ? 'Chargement...' : 'Actualiser' }}
       </button>
     </div>
 
-    <!-- SECTION ASSETS -->
+    <!-- SECTION 1 : SALAIRES PAR GENRE -->
     <div class="dashboard-section">
       <div class="section-header">
         <div>
-          <h2 class="section-title">Parc Informatique</h2>
-          <p class="section-sub">Gestion des actifs matériels</p>
+          <h2 class="section-title">Montant par genre</h2>
+          <p class="section-sub">Répartition des salaires par genre</p>
         </div>
         <div class="section-total">
-          <span class="total-badge">{{ stats?.assets.total || 0 }} éléments</span>
+          <span class="total-badge">{{ totalSalairesGenre.toFixed(2) }} € total</span>
         </div>
       </div>
 
-      <!-- KPI Grid - Assets par type -->
+      <!-- KPI Grid - Par genre -->
       <div class="kpi-grid">
         <div class="kpi-card blue">
-          <div class="kpi-value">{{ stats?.assets.total || 0 }}</div>
-          <div class="kpi-label">Total actifs</div>
-          <div class="kpi-sub">Tous équipements confondus</div>
+          <div class="kpi-value">{{ totalSalairesGenre.toFixed(2) }} €</div>
+          <div class="kpi-label">Total</div>
+          <div class="kpi-sub">Tous genres confondus</div>
         </div>
         <div 
-          v-for="(count, type) in sortedAssetTypes" 
-          :key="type" 
+          v-for="item in statsByGenre" 
+          :key="item.genre"
           class="kpi-card"
-          :class="getAssetCardColor(type)"
+          :class="getGenreCardColor(item.genre)"
         >
-          <div class="kpi-value">{{ count }}</div>
-          <div class="kpi-label">{{ getAssetTypeLabel(type) }}</div>
-          <div class="kpi-sub">{{ getAssetTypeDesc(type) }}</div>
-        </div>
-      </div>
-
-      <!-- NOUVEAU : KPI Grid - Assets par statut -->
-      <div class="kpi-subtitle">
-        <h3>Par statut</h3>
-      </div>
-      <div class="kpi-grid">
-        <template v-for="(count, status) in sortedAssetStatuses" :key="status">
-          <div 
-            v-if="count > 0"
-            class="kpi-card"
-            :class="getAssetStatusCardColor(status)"
-          >
-            <div class="kpi-value">{{ count }}</div>
-            <div class="kpi-label">{{ getAssetStatusLabel(status) }}</div>
-            <div class="kpi-sub">{{ getAssetStatusDescription(status) }}</div>
-          </div>
-        </template>
-      </div>
-
-      <!-- Tableau des assets récents -->
-      <div class="data-table-container">
-        <div class="table-header">
-          <h3>Derniers équipements ajoutés</h3>
-        </div>
-        <div v-if="loadingAssets" class="loading-state">
-          <div class="spinner"></div>
-        </div>
-        <table v-else-if="recentAssets.length > 0" class="data-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Nom</th>
-              <th>Type</th>
-              <th>Statut</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="asset in recentAssets" :key="asset.id">
-              <td class="col-id">#{{ asset.id }}</td>
-              <td class="col-name">{{ asset.name }}</td>
-              <td><span class="badge" :class="getAssetBadgeClass(asset.type)">{{ getAssetTypeLabel(asset.type) }}</span></td>
-              <td><span class="status-badge" :class="getAssetStatusBadgeClass(asset.status)">{{ asset.status }}</span></td>
-            </tr>
-          </tbody>
-        </table>
-        <div v-else class="empty-state">Aucun équipement trouvé</div>
-      </div>
-    </div>
-
-    <!-- SECTION TICKETS -->
-    <div class="dashboard-section">
-      <div class="section-header">
-        <div>
-          <h2 class="section-title">Tickets</h2>
-          <p class="section-sub">Suivi des incidents et demandes</p>
-        </div>
-        <div class="section-total">
-          <span class="total-badge">{{ stats?.tickets.total || 0 }} tickets</span>
-        </div>
-      </div>
-
-      <!-- KPI Grid - Tickets -->
-      <div class="kpi-grid">
-        <div class="kpi-card orange">
-          <div class="kpi-value">{{ stats?.tickets.total || 0 }}</div>
-          <div class="kpi-label">Total tickets</div>
-          <div class="kpi-sub">Tous tickets confondus</div>
-        </div>
-        <div class="kpi-card red">
-          <div class="kpi-value">{{ stats?.tickets.byType[1] || 0 }}</div>
-          <div class="kpi-label">Incidents</div>
-          <div class="kpi-sub">Tickets de type incident</div>
-        </div>
-        <div class="kpi-card cyan">
-          <div class="kpi-value">{{ stats?.tickets.byType[2] || 0 }}</div>
-          <div class="kpi-label">Demandes</div>
-          <div class="kpi-sub">Tickets de type demande</div>
+          <div class="kpi-value">{{ item.total_salary.toFixed(2) }} €</div>
+          <div class="kpi-label">{{ item.genre }}</div>
+          <div class="kpi-sub">{{ item.count }} employé(s)</div>
         </div>
         <div class="kpi-card green">
-          <div class="kpi-value">{{ stats?.tickets.openCount || 0 }}</div>
-          <div class="kpi-label">Tickets ouverts</div>
-          <div class="kpi-sub">En cours de traitement</div>
+          <div class="kpi-value">{{ totalPayeGenre.toFixed(2) }} €</div>
+          <div class="kpi-label">Total payé</div>
+          <div class="kpi-sub">Paiements effectués</div>
         </div>
       </div>
 
-      <!-- KPI Grid - Tickets par Statut -->
-      <div class="kpi-subtitle">
-        <h3>Par statut</h3>
-      </div>
-      <div class="kpi-grid">
-        <template v-for="statusId in [1,2,3,4,5,6]" :key="statusId">
-          <div 
-            v-if="(stats?.tickets.byStatus[statusId] || 0) > 0"
-            class="kpi-card"
-            :class="getStatusCardColor(statusId)"
-          >
-            <div class="kpi-value">{{ stats?.tickets.byStatus[statusId] || 0 }}</div>
-            <div class="kpi-label">{{ getStatusLabel(statusId) }}</div>
-            <div class="kpi-sub">{{ getStatusDescription(statusId) }}</div>
-          </div>
-        </template>
-      </div>
-
-      <!-- Tableau des tickets récents -->
+      <!-- Tableau des salaires par genre -->
       <div class="data-table-container">
         <div class="table-header">
-          <h3>Derniers tickets créés</h3>
+          <h3>Détail par genre</h3>
         </div>
-        <div v-if="loadingTickets" class="loading-state">
+        <div v-if="loading" class="loading-state">
           <div class="spinner"></div>
         </div>
-        <table v-else-if="recentTickets.length > 0" class="data-table">
+        <table v-else-if="statsByGenre.length > 0" class="data-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Titre</th>
-              <th>Type</th>
-              <th>Statut</th>
-              <th>Priorité</th>
-              <th>Créé le</th>
+              <th>Genre</th>
+              <th>Montant total</th>
+              <th>Montant payé</th>
+              <th>Nombre d'employés</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="ticket in recentTickets" :key="ticket.id">
-              <td class="col-id">#{{ ticket.id }}</td>
-              <td class="col-name">{{ ticket.title }}</td>
-              <td><span class="badge" :class="ticket.type === 1 ? 'badge-red' : 'badge-cyan'">{{ ticket.type === 1 ? 'Incident' : 'Demande' }}</span></td>
-              <td><span class="status-badge" :class="getTicketStatusClass(ticket.status)">{{ ticket.statusLabel }}</span></td>
-              <td><span class="priority-badge" :class="getPriorityClass(ticket.priority)">{{ ticket.priorityLabel }}</span></td>
-              <td class="col-date">{{ ticket.date }}</td>
+            <tr v-for="item in statsByGenre" :key="item.genre">
+              <td class="col-name">{{ item.genre }}</td>
+              <td class="col-amount">{{ item.total_salary.toFixed(2) }} €</td>
+              <td class="col-amount">{{ item.total_paid.toFixed(2) }} €</td>
+              <td>{{ item.count }}</td>
             </tr>
           </tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td><strong>Total</strong></td>
+              <td><strong>{{ totalSalairesGenre.toFixed(2) }} €</strong></td>
+              <td><strong>{{ totalPayeGenre.toFixed(2) }} €</strong></td>
+              <td><strong>{{ totalEmployesGenre }}</strong></td>
+            </tr>
+          </tfoot>
         </table>
-        <div v-else class="empty-state">Aucun ticket trouvé</div>
+        <div v-else class="empty-state">Aucune donnée disponible</div>
       </div>
     </div>
-    
+
+   <!-- Section 2 : PAIEMENTS PAR MOIS -->
+  <div class="dashboard-section">
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Montant par mois</h2>
+        <p class="section-sub">Analyse mensuelle des salaires (date début salaire)</p>
+      </div>
+      <div class="section-total">
+        <span class="total-badge">{{ statsByMois.length }} mois</span>
+      </div>
+    </div>
+
+    <!-- KPI Grid - Mois -->
+    <div class="kpi-grid">
+      <div 
+        v-for="item in statsByMois.slice(0, 6)" 
+        :key="item.mois"
+        class="kpi-card"
+        :class="getMonthCardColor(item.mois)"
+      >
+        <div class="kpi-value">{{ item.total_amount.toFixed(2) }} €</div>
+        <div class="kpi-label">{{ item.mois_label }}</div>
+        <div class="kpi-sub">{{ item.count }} salaire(s)</div>
+      </div>
+    </div>
+
+    <!-- Tableau des paiements par mois -->
+    <div class="data-table-container">
+      <div class="table-header">
+        <h3>Détail par mois</h3>
+      </div>
+      <div v-if="loading" class="loading-state">
+        <div class="spinner"></div>
+      </div>
+      <table v-else-if="statsByMois.length > 0" class="data-table">
+        <thead>
+          <tr>
+            <th>Mois</th>
+            <th>Total salaire</th>
+            <th>Nb salaires</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in statsByMois" :key="item.mois" style="cursor:pointer;">
+            <td class="col-name">{{ item.mois_label }}</td>
+            <td class="col-amount">{{ item.total_amount.toFixed(2) }} €</td>
+            <td>{{ item.count }}</td>
+            <td>
+              <button class="btn-outline-sm" @click="showMonthDetails(item.mois)">Voir détails</button>
+            </td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td><strong>Total</strong></td>
+            <td><strong>{{ totalSalairesMois.toFixed(2) }} €</strong></td>
+            <td><strong>{{ totalPaiementsMois }}</strong></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+      <div v-else class="empty-state">Aucune donnée disponible</div>
+    </div>
+  </div>
+
+    <!-- Modal détails par mois -->
+    <div v-if="selectedMonth" class="modal-overlay" @click.self="closeModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Détails - {{ formatMonth(selectedMonth) }}</h2>
+          <button class="modal-close" @click="closeModal">×</button>
+        </div>
+        
+        <div v-if="monthDetails.length === 0" class="empty-state">
+          Aucun salaire pour ce mois
+        </div>
+        <table v-else class="data-table modal-table">
+          <thead>
+            <tr>
+              <th>Employé</th>
+              <th>Genre</th>
+              <th>Montant</th>
+              <th>Date début salaire</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="s in monthDetails" :key="s.salary_id">
+              <td class="col-name">{{ s.employe_nom }}</td>
+              <td>{{ s.genre || 'Non spécifié' }}</td>
+              <td class="col-amount">{{ s.montant.toFixed(2) }} €</td>
+              <td>{{ formatDate(s.date_salaire) }}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td colspan="2"><strong>Total</strong></td>
+              <td><strong>{{ monthTotal.toFixed(2) }} €</strong></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
 
     <!-- API Info Banner -->
     <div class="api-banner animate-in" v-if="apiError">
       <div class="api-banner-content">
-        <div class="api-banner-title">⚠️ Erreur de connexion</div>
+        <div class="api-banner-title">Erreur de connexion</div>
         <div class="api-banner-msg">{{ apiError }}</div>
       </div>
       <button class="btn-outline-sm" @click="refreshAll">Réessayer</button>
@@ -199,258 +206,132 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { getDashboardStats,TICKET_STATUS_LABELS, ASSET_TYPE_LABELS, type DashboardStats } from '@/services/api/dashboardService'
-import { fetchAllTickets } from '@/services/api/ticketService'
-import { fetchAllAssets, getAssetStatusById} from '@/services/api/assetService'
+import { ref, computed, onMounted } from 'vue'
+import { dashboardService } from '@/services/backoffice/dashboard'
+
+interface StatsGenre { genre: string, total_salary: number, total_paid: number, count: number }
+interface StatsMois { mois: string, mois_label: string, total_amount: number, count: number }
 
 const loading = ref(false)
-const loadingAssets = ref(false)
-const loadingTickets = ref(false)
 const apiError = ref('')
-const stats = ref<DashboardStats | null>(null)
+const statsByGenre = ref<StatsGenre[]>([])
+const statsByMois = ref<StatsMois[]>([])
+const selectedMonth = ref<string | null>(null)
+const monthDetails = ref<any[]>([])
 
-// Données pour les tableaux
-const recentAssets = ref<any[]>([])
-const recentTickets = ref<any[]>([])
-
-// Trier les types d'assets
-const sortedAssetTypes = computed(() => {
-  if (!stats.value) return {}
-  const entries = Object.entries(stats.value.assets.byType)
-  entries.sort((a, b) => getAssetTypeLabel(a[0]).localeCompare(getAssetTypeLabel(b[0])))
-  return Object.fromEntries(entries)
+// ─── COMPUTED MOIS ───────────────────────────────────────────────────────────
+const totalSalairesMois = computed(() => {
+  return statsByMois.value.reduce((sum, item) => sum + item.total_amount, 0)
 })
 
-// Helpers Assets
-function getAssetCardColor(type: string): string {
-  const colors: Record<string, string> = {
-    'Computer': 'blue',
-    'Monitor': 'green',
-    'Printer': 'orange',
-    'Phone': 'purple',
-    'NetworkEquipment': 'cyan'
-  }
-  return colors[type] || 'gray'
-}
-
-function getAssetTypeLabel(type: string): string {
-  return ASSET_TYPE_LABELS[type] || type
-}
-
-function getAssetTypeDesc(type: string): string {
-  const desc: Record<string, string> = {
-    'Computer': 'Postes de travail',
-    'Monitor': 'Écrans et afficheurs',
-    'Printer': 'Imprimantes et scanners',
-    'Phone': 'Téléphones IP',
-    'NetworkEquipment': 'Switchs, routeurs'
-  }
-  return desc[type] || 'Équipement'
-}
-
-function getAssetBadgeClass(type: string): string {
-  const classes: Record<string, string> = {
-    'Computer': 'badge-blue',
-    'Monitor': 'badge-green',
-    'Printer': 'badge-orange',
-    'Phone': 'badge-purple',
-    'NetworkEquipment': 'badge-cyan'
-  }
-  return classes[type] || 'badge-gray'
-}
-
-
-// NOUVEAU : Trier les statuts des assets
-const sortedAssetStatuses = computed(() => {
-  if (!stats.value) return {}
-  const entries = Object.entries(stats.value.assets.byStatus)
-  // Ordre personnalisé
-  const order = ['En service', 'En stock', 'En maintenance', 'En panne', 'Réformé']
-  entries.sort((a, b) => {
-    const indexA = order.indexOf(a[0])
-    const indexB = order.indexOf(b[0])
-    if (indexA === -1 && indexB === -1) return a[0].localeCompare(b[0])
-    if (indexA === -1) return 1
-    if (indexB === -1) return -1
-    return indexA - indexB
-  })
-  return Object.fromEntries(entries)
+const totalPaiementsMois = computed(() => {
+  return statsByMois.value.reduce((sum, item) => sum + item.count, 0)
 })
 
-// Nouvelles fonctions pour les statuts des assets
-function getAssetStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    'En service': 'En service',
-    'En stock': 'En stock',
-    'En maintenance': 'En maintenance',
-    'En panne': 'En panne',
-    'Réformé': 'Réformé'
-  }
-  return labels[status] || status
-}
-function getAssetStatusDescription(status: string): string {
-  const descriptions: Record<string, string> = {
-    'En service': 'Équipements opérationnels',
-    'En stock': 'En réserve',
-    'En maintenance': 'En réparation',
-    'En panne': 'Hors service',
-    'Réformé': 'Retiré du parc'
-  }
-  return descriptions[status] || ''
-}
+// ─── COMPUTED GENRE ──────────────────────────────────────────────────────────
+const totalSalairesGenre = computed(() => {
+  return statsByGenre.value.reduce((sum, item) => sum + item.total_salary, 0)
+})
 
-function getAssetStatusCardColor(status: string): string {
+const totalPayeGenre = computed(() => {
+  return statsByGenre.value.reduce((sum, item) => sum + item.total_paid, 0)
+})
+
+const totalEmployesGenre = computed(() => {
+  return statsByGenre.value.reduce((sum, item) => sum + item.count, 0)
+})
+
+const monthTotal = computed(() => {
+  return monthDetails.value.reduce((sum, p) => sum + p.montant, 0)
+})
+
+// ─── COULEURS ────────────────────────────────────────────────────────────────
+function getGenreCardColor(genre: string): string {
   const colors: Record<string, string> = {
-    'En service': 'green',
-    'En stock': 'yellow',
-    'En maintenance': 'orange',
-    'En panne': 'red',
-    'Réformé': 'gray'
+    'Homme': 'blue',
+    'Femme': 'pink',
   }
-  return colors[status] || 'gray'
+  return colors[genre] || 'gray'
 }
 
-function getAssetStatusBadgeClass(status: string): string {
-  const classes: Record<string, string> = {
-    'En service': 'status-production',
-    'En stock': 'status-stock',
-    'En maintenance': 'status-maintenance',
-    'En panne': 'status-panne',
-    'Réformé': 'status-reformed'
-  }
-  return classes[status] || 'status-default'
+function getMonthCardColor(mois: string): string {
+  const colors = ['blue', 'green', 'purple', 'orange', 'cyan', 'pink']
+  const index = new Date(mois + '-01').getMonth()
+  return colors[index % colors.length]
 }
 
-// function getStatusClass(status: string): string {
-//   const statusMap: Record<string, string> = {
-//     'En production': 'status-production',
-//     'En service': 'status-production',
-//     'En stock': 'status-stock',
-//     'Réformé': 'status-reformed',
-//     'En maintenance': 'status-maintenance',
-//     'En panne': 'status-panne'
-//   }
-//   return statusMap[status] || 'status-default'
-// }
-
-// Helpers Tickets
-function getTicketStatusClass(status: number): string {
-  const classes: Record<number, string> = {
-    1: 'status-new',
-    2: 'status-progress',
-    3: 'status-planned',
-    4: 'status-pending',
-    5: 'status-solved',
-    6: 'status-closed'
-  }
-  return classes[status] || 'status-default'
+function getEcartClass(salary: number, paid: number): string {
+  if (salary === paid) return 'ecart-zero'
+  if (paid > salary) return 'ecart-positive'
+  return 'ecart-negative'
 }
 
-function getPriorityClass(priority: number): string {
-  if (priority >= 5) return 'priority-critical'
-  if (priority >= 4) return 'priority-high'
-  if (priority >= 3) return 'priority-medium'
-  return 'priority-low'
+// ─── FORMATAGE ──────────────────────────────────────────────────────────────
+const formatMonth = (mois: string) => {
+  const [year, month] = mois.split('-')
+  const months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
+  return `${months[parseInt(month) - 1]} ${year}`
 }
 
-function getPriorityLabel(priority: number): string {
-  const labels: Record<number, string> = {
-    1: 'Très basse', 2: 'Basse', 3: 'Moyenne', 4: 'Haute', 5: 'Très haute', 6: 'Majeure'
-  }
-  return labels[priority] || 'Moyenne'
+const formatDate = (date: string) => {
+  if (!date) return 'Non définie'
+  const d = new Date(date)
+  return d.toLocaleDateString('fr-FR')
 }
 
-// Nouvelles fonctions pour les statuts
-function getStatusLabel(statusId: number): string {
-  return TICKET_STATUS_LABELS[statusId] || 'Inconnu';
-}
-
-function getStatusDescription(statusId: number): string {
-  const descriptions: Record<number, string> = {
-    1: 'Ticket nouvellement créé',
-    2: 'En cours de traitement',
-    3: 'Action planifiée',
-    4: 'En attente d\'information',
-    5: 'Problème résolu',
-    6: 'Ticket fermé'
-  };
-  return descriptions[statusId] || '';
-}
-
-function getStatusCardColor(statusId: number): string {
-  const colors: Record<number, string> = {
-    1: 'blue',
-    2: 'orange',
-    3: 'orange',
-    4: 'gray',
-    5: 'green',
-    6: 'gray'
-  };
-  return colors[statusId] || 'gray';
-}
-
-// Chargement des données
-async function refreshAll() {
+// ─── MÉTHODES ────────────────────────────────────────────────────────────────
+const refreshAll = async () => {
   loading.value = true
   apiError.value = ''
-  loadingAssets.value = true
-  loadingTickets.value = true
   
   try {
-    // Charger les statistiques
-    stats.value = await getDashboardStats()
+    const [salaries, payments, counts, byMois] = await Promise.all([
+      dashboardService.GetSalaryByGender(),
+      dashboardService.GetPaymentByGender(),
+      dashboardService.CountByGender(),
+      dashboardService.GetSalaryPerMonth()
+    ]);
     
-    // Charger les assets récents
-    const allAssets = await fetchAllAssets()
-    // Enrichir chaque asset avec son statut
-    const assetsWithStatus = await Promise.all(
-      allAssets.map(async (asset) => {
-        const status = await getAssetStatusById(asset.itemtype, asset.id)
-        return {
-          ...asset,
-          status: status
-        }
-      })
-    )
+    const genreMap: Record<string, any> = {};
+    salaries.forEach(s => { genreMap[s.genre] = { total_salary: s.total_salary, total_paid: 0, count: 0 }; });
+    payments.forEach(p => { 
+      if (!genreMap[p.genre]) genreMap[p.genre] = { total_salary: 0, total_paid: 0, count: 0 };
+      genreMap[p.genre].total_paid = p.total_paid; 
+    });
+    counts.forEach(c => {
+      if (!genreMap[c.genre]) genreMap[c.genre] = { total_salary: 0, total_paid: 0, count: 0 };
+      genreMap[c.genre].count = c.count;
+    });
     
-    // Trier et prendre les 10 plus récents
-    recentAssets.value = assetsWithStatus
-      .sort((a, b) => (b.id || 0) - (a.id || 0))
-      .slice(0, 10)
-      .map(a => ({
-        id: a.id,
-        name: a.name,
-        type: a.itemtype,
-        status: a.status,  // ← Maintenant c'est une string
-        // locationName: a.locationName,
-        // userName: a.userName
-      }))
-    
-    // Charger les tickets récents
-    const allTickets = await fetchAllTickets()
-    recentTickets.value = allTickets
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 10)
-      .map(t => ({
-        id: t.id,
-        title: t.title,
-        type: t.type,
-        status: t.status,
-        statusLabel: getStatusLabel(t.status),
-        priority: t.priority,
-        priorityLabel: getPriorityLabel(t.priority),
-        date: new Date(t.createdAt).toLocaleDateString('fr-FR')
-      }))
-    
+    statsByGenre.value = Object.keys(genreMap).map(genre => ({
+      genre,
+      total_salary: genreMap[genre].total_salary,
+      total_paid: genreMap[genre].total_paid,
+      count: genreMap[genre].count
+    })).sort((a, b) => b.total_salary - a.total_salary);
+
+    statsByMois.value = byMois;
   } catch (e: any) {
     console.error('Erreur chargement dashboard:', e)
-    apiError.value = e.message || 'Erreur de connexion à GLPI'
+    apiError.value = e.message || 'Erreur de connexion à Dolibarr'
   } finally {
     loading.value = false
-    loadingAssets.value = false
-    loadingTickets.value = false
   }
+}
+
+const showMonthDetails = async (mois: string) => {
+  selectedMonth.value = mois
+  try {
+    monthDetails.value = await dashboardService.getSalaireByMois(mois)
+  } catch (error) {
+    console.error('Erreur chargement détails:', error)
+    monthDetails.value = []
+  }
+}
+
+const closeModal = () => {
+  selectedMonth.value = null
+  monthDetails.value = []
 }
 
 onMounted(() => {
@@ -461,4 +342,99 @@ onMounted(() => {
 <style scoped>
 @import '@/styles/DashboardView.css';
 
+/* Styles supplémentaires pour l'écart */
+.ecart-negative {
+  color: #dc2626;
+}
+.ecart-positive {
+  color: #16a34a;
+}
+.ecart-zero {
+  color: #6b7280;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  max-width: 750px;
+  width: 92%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 10;
+  border-radius: 16px 16px 0 0;
+}
+
+.modal-header h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.8rem;
+  cursor: pointer;
+  color: #94a3b8;
+  line-height: 1;
+}
+
+.modal-close:hover {
+  color: #0f172a;
+}
+
+.modal-table {
+  margin: 0;
+}
+
+.modal-table thead th {
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  z-index: 5;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .modal-content {
+    width: 95%;
+    max-height: 90vh;
+  }
+  
+  .modal-header {
+    padding: 1rem 1.5rem;
+  }
+  
+  .modal-header h2 {
+    font-size: 1rem;
+  }
+}
 </style>

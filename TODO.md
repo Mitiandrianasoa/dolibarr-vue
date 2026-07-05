@@ -1,123 +1,40 @@
-FO:
-  - page pour créer un ticket, on peut associer plusieurs éléments au 
-ticket
-  -  Créer la page pour afficher la liste des éléments(ASSETS)
-    
-      - avec recherche multi critère 
+1. Backoffice 
+    - créer une page avec un bouton pour réinitialiser les données 
+    - créer la page pour importer les 2 fichiers  
+        -2 fichiers csv pour le contenu    
+        - 1 fichier zip pour les images :  
 
-BO:
-  - Dashboard pour afficher  
-      - le nombre d’éléments général, avec détails par type 
-      - le nombre de ticket général, avec détail par type 
-  - Page pour afficher les tickets , avec une fiche. 
-  - une page avec un bouton pour réinitialiser les données 
-  -  créer la page pour importer les 4 fichiers(4 input files)  
-      - 3 fichiers csv pour le contenu    
-      - 1 fichier zip pour les images
- todo-test-fetch
- 
- 2nd pull 2
- Test-Mitia
+    - Dashboard pour afficher  
+        - le montant de salaire par genre 
+        -
+        - le montant de salaire par mois ( date debut salaire comme reference)
 
+2. FrontOffice 
+    - Créer la page pour afficher la liste des salairés 
+        - avec recherche multi critère 
+    - Page pour créer et payer un salaire ( on payer en plusieurs fois)  
 
-# ALEA 1:
-CHANGEMENT DE STATUS TERMINE DANS KANBAN
-BOITE DE DIALOGUE 
-AJOUT SUPER COST. 
-STOCKER DANS SQLITE 
+PARTIE 2 
+1. Backoffice 
+    - ajouter une table jour férié dans sqlite 
 
-NOUVELLE PAGE COUT:
-COUT original dans un ticket 
-  - si deux elements ou plus dans le tickets diviser le cout fixe
-  - affichage par type 
-  - PLUS SUPER COST DEPUIS SQLITE
-TOTAL 
+2. FrontOffice 
+    - créer un CRUD pour les jours fériés 
+    - créer une page pour générer le salaire de plusieurs salariés en même temps 
+        - il y a filtre qui permet de choisir les salariés 
+            - Poste 
+            - Genre 
+            - Heure de travail min et max 
 
-page des couts afficher par type [moniteur, phone, ordi]
-- depuis glpi
-- sqlite super cout
+        - ensuite il y a un bouton générer salaire 
+            - date début et date fin 
+            - montant 
+cela va générer le salaire de tous les employés sélectionnés par le 
+filtre 
 
-
-
-Get-ChildrenItem D:\S6\EVAL\EVAL 2\gpli-vue
-Where-Object {$_.LastWriteTime -gt (Get-Date).AddMinutes(-30)} |
-Sort-Object LastWriteTime -Descending|
-Select-Object LastWriteTime , FullName
-
-Get-ChildItem "D:\S6\EVAL\EVAL 2\gpli-vue" -File |
-Where-Object {$_.LastWriteTime -gt (Get-Date).AddMinutes(-30)} |
-Sort-Object LastWriteTime -Descending |
-Select-Object LastWriteTime, FullName  
-
-
-# ALEA 2:
-- Ticket CLosed l'on peut envoyer in progress
-- Button: 
-  - Annulation effacer dernier supercost depuis sqlite.
-      - supercost liee a ce ticket
-  - Reouverture
-    - champs en pourcentage par exemple 10%
-    - cout de reouverture 10% du dernier supercost
-    - l'on n'efface pas le supercost pour ce dernier
-- page CostReportView.vue
-  - ajout section cost reoverture 
-
-# REAL LIGNE DE COMMADE QUI MARCHE POUR NOUS 
-Get-ChildItem "D:\S6\EVAL\EVAL 2\GLP-16-06\gpli-backend - Test"
-Where-Object {$_.LastWriteTime -gt (Get-Date).AddMinutes(-90)}|
-Sort-Object LastWriteTime -Descending |
-Select-Object LastWriteTime, FullName
-
-Get-ChildItem "D:\S6\EVAL\EVAL 2\GLP-16-06"
-Where-Object {$_.LastWriteTime -gt (Get-Date).AddMinutes(-90)}|
-Sort-Object LastWriteTime -Descending |
-Select-Object LastWriteTime, FullName
-
-
-
-# ALEA 3 
-- nouvelle page import: import mouvement 
-  - csv 3 colonnes 
-    - ticket(ref ticket)
-    - mvt
-    - valeur
-  par exemple ticket 1, open, 5(reouverture)
-                      2, canceled, (annuler ticket)
-                      2, closed, 100 (terminer avec supercout 100 a inserer dans sqlite)
-  - function importService
-      - MouvementInsert(csv)
-    - page costReportView a modifier:
-      - details pour chaque categories:
-          - items/assets + cout
-
-
-# ALEA SCENARIO:
-Ticket 1 
-terminer 100
-reouverture 5
-terminer 45
-
-Ticket 2 
-reouverture 10
-terminer 100
-
-ETU003145
-
-
-# ALEA 4:
-CALCUL REOUVERTURE: %VALEUR de reouverture 
-	- MODE 1: DERNIER SUPERCOUT
-	- MODE 2: PREMIER SUPERCOUT
-	- MODE 3: MOYENNE DES SUPERCOUTS 
-	- MODE 4: SOMME DES SUPERCOUTS 
-	
-IMPORT MVT:
-- (OK) NOUVELLE COLONNE:
-	- mode 
-	- uniquement valide pour le mvt open
-
-front:
- - dialogue de reouverture:  
-	- ZONE DE LISTE [1,2,3,4] dans l'import pour chaque ligne.
-appel function/ version avec idTicket
-
+    - créer une page “liste salariés”, sans filtre(nouvelle page) 
+        - créer un  lien pour chaque salairé, qui va afficher: 
+            - les infos du salarié 
+            - un tableau historique des salaires et les paiements 
+            correspondant 
+            - le montant “reste à payer” 

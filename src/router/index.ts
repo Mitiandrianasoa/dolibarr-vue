@@ -1,22 +1,27 @@
+// src/router/index.ts
 import { createRouter, createWebHistory } from 'vue-router'
-import { getSessionToken } from '@/services/api/glpiClient'
+import { dolibarrAuthService } from '@/services/dolibarrAuthService'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    // ─── PAGE DE LOGIN ──────────────────────────────────────────────────────
     {
       path: '/login',
       name: 'login',
       component: () => import('@/views/LoginView.vue'),
       meta: { public: true },
     },
+
+    // ─── BACKOFFICE ──────────────────────────────────────────────────────────
     {
       path: '/',
       component: () => import('@/components/layout/AppLayout.vue'),
+      meta: { requiresAuth: true },
       children: [
         {
           path: '',
-          redirect: '/login',
+          redirect: '/dashboard',
         },
         {
           path: 'dashboard',
@@ -25,127 +30,115 @@ const router = createRouter({
           meta: { title: 'Tableau de bord' },
         },
         {
-          path: 'tickets',
-          name: 'tickets back',
-          component: () => import('@/views/back/TicketsView.vue'),
-          meta: { title: 'Tickets' },
-        },
-        {
-          path: 'tickets/create',
-          name: 'ticket-create-back',
-          component: () => import('@/views/back/TicketCreateView.vue'),
-          meta: { title: 'Créer un Ticket' },
-        },
-        // Ajouter cette route
-        {
-          path: '/tickets/:id/edit',
-          name: 'TicketEdit',
-          component: () => import('@/views/back/TicketEditView.vue'),
-          meta: { title: 'Modifier le ticket' }
-        },
-         {
-          path: 'assets',
-          name: 'assets back',
-          component: () => import('@/views/back/AssetsView.vue'),
-          meta: { title: 'Actifs' },
-        },
-        {
-          path: 'kanban-settings',
-          name: 'kanban-settings',
-          component: () => import('@/views/back/KanbanSettingsView.vue'),
-          meta: { title: 'Paramètres Kanban' },
+          path: 'import',
+          name: 'import',
+          component: () => import('@/views/back/importView.vue'),
+          meta: { title: 'Importation de données' },
         },
         {
           path: 'reset',
           name: 'reset',
-          component: () => import('@/views/ResetView.vue'),
+          component: () => import('@/views/back/ResetView.vue'),
           meta: { title: 'Réinitialiser' },
         },
-        // router/index.ts — ajouter la route
-        {
-          path: 'import',
-          name: 'import',
-          component: () => import('@/views/back/ImportView.vue'),
-          meta: { title: 'Import de données' },
-        },
-        {
-          path: 'import-mvt',
-          name: 'import-mvt',
-          component: () => import('@/views/back/ImportMvtView.vue'),
-          meta: { title: 'Import mouvement' },
-        },
-       
       ],
     },
+
+    // ─── FRONTOFFICE ──────────────────────────────────────────────────────────
     {
       path: '/front',
       component: () => import('@/components/layout/AppFrontLayout.vue'),
+      meta: { requiresAuth: true },
       children: [
         {
-          path: 'tickets',
-          name: 'tickets',
-          component: () => import('@/views/front/TicketsView.vue'),
-          meta: { title: 'Tickets' },
+          path: '/front/employees',
+          name: 'front-employees',
+          component: () => import('@/views/front/EmployeesView.vue'),
+          meta: { title: 'Liste des employés' },
         },
         {
-          path: 'tickets/create',
-          name: 'ticket-create',
-          component: () => import('@/views/front/TicketCreateView.vue'),
-          meta: { title: 'Créer un Ticket' },
-        },
-         {
-          path: 'assets',
-          name: 'assets',
-          component: () => import('@/views/front/AssetsView.vue'),
-          meta: { title: 'Actifs' },
+          path: '/front/salaries-list',
+          name: 'front-salaries-list',
+          component: () => import('@/views/front/EmployeeListView.vue'),
+          meta: { title: 'Liste salariés' },
         },
         {
-          path: 'kanban',
-          name: 'front-kanban',
-          component: () => import('@/views/front/KanbanView.vue'),
-          meta: { title: 'Kanban' },
-        },
-         {
-          path: 'costs',
-          name: 'front-costs',
-          component: () => import('@/views/front/CostReportView.vue'),
-          meta: { title: 'Rapport des coûts' },
+          path: '/front/employees/:id',
+          name: 'front-employee-detail',
+          component: () => import('@/views/front/EmployeeDetailView.vue'),
+          meta: { title: 'Détail salarié' },
         },
         {
-          path: 'super-costs',
-          name: 'front-super-costs',
-          component: () => import('@/views/front/SuperCostsView.vue'),
-          meta: { title: 'Gestion des coûts' },
+          path: '/front/leaves',
+          name: 'front-leaves',
+          component: () => import('@/views/front/HolidaysView.vue'),
+          meta: { title: 'Jours fériés' },
         },
-      ]
+        {
+          path: '/front/salaries/bulk',
+          name: 'front-salary-bulk',
+          component: () => import('@/views/front/BulkSalaryView.vue'),
+          meta: { title: 'Génération salaires en masse' },
+        },
+        {
+          path: '/front/salaries',
+          name: 'front-salaries',
+          component: () => import('@/views/front/SalariesView.vue'),
+          meta: { title: 'Liste des salaires' },
+        },
+        {
+          path: '/front/salaries/create',
+          name: 'front-salary-create',
+          component: () => import('@/views/front/SalaryFromView.vue'),
+          meta: { title: 'Créer un salaire' },
+        },
+        {
+          path: '/front/salaries/:id',
+          name: 'front-salary-detail',
+          component: () => import('@/views/front/SalaryDetailView.vue'),
+          meta: { title: 'Détail du salaire' },
+        },
+        {
+          path: '/front/salaries/:id/edit',
+          name: 'front-salary-edit',
+          component: () => import('@/views/front/SalaryFromView.vue'),
+          meta: { title: 'Modifier le salaire' },
+        },
+      ],
     },
-    { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
+
+    // ─── REDIRECTION 404 ────────────────────────────────────────────────────
     {
-      path: '/test',
-      // component: () => import('@/components/layout/AppFrontLayout.vue'),
-      children: [
-        {
-          path: 'toDo',
-          name: 'toDo-test',
-          component: () => import('@/views/test/ToDoView.vue'),
-          meta: { title: 'To-Do List' },
-        },
-        {
-          path: 'ticketsAnciens',
-          name: 'tickets-anciens-test',
-          component: () => import('@/views/test/TicketTest.vue'),
-          meta: { title: 'Tickets Anciens' },
-        },
-      ]
+      path: '/:pathMatch(.*)*',
+      redirect: '/dashboard',
     },
   ],
 })
 
-// Guard : rediriger vers /login si pas de session
-router.beforeEach((to) => {
-  if (!to.meta.public && !getSessionToken()) {
-    return { name: 'login' }
+// ─── GUARD DE NAVIGATION CORRIGÉ ────────────────────────────────────────────
+router.beforeEach((to, from) => {
+  const isAuthenticated = dolibarrAuthService.isAuthenticated()
+  
+  // 🔹 Si la route est publique (login)
+  if (to.meta.public) {
+    // Si déjà authentifié → rediriger vers dashboard
+    if (isAuthenticated) {
+      return '/dashboard'
+    }
+    // Sinon, autoriser l'accès à login
+    return true
   }
+  
+  // 🔹 Si la route nécessite une authentification
+  if (to.meta.requiresAuth !== false) {
+    // Si non authentifié → rediriger vers login
+    if (!isAuthenticated) {
+      return '/login'
+    }
+  }
+  
+  // 🔹 Sinon, autoriser l'accès
+  return true
 })
 
 export default router

@@ -12,38 +12,67 @@
               <line x1="12" y1="17" x2="12" y2="21"/>
             </svg>
           </div>
-          <span class="logo-text">GLPI Front</span>
+          <span class="logo-text">Dolibarr Front</span>
         </div>
 
-        <!-- Navigation Front simplifiée -->
+        <!-- Navigation Front - Salaires -->
         <nav class="front-nav">
-          <router-link to="/front/tickets" class="nav-link" active-class="active">
+          <!-- <router-link to="/front/dashboard" class="nav-link" active-class="active">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
+              <rect x="3" y="3" width="7" height="7" rx="1"/>
+              <rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/>
+              <rect x="14" y="14" width="7" height="7" rx="1"/>
             </svg>
-            Tickets
-          </router-link>
-          <router-link to="/front/assets" class="nav-link" active-class="active">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="2" y="3" width="20" height="14" rx="2"/>
-              <line x1="8" y1="21" x2="16" y2="21"/>
-            </svg>
-            Éléments
-          </router-link>
-          <router-link to="/front/kanban" class="nav-link" active-class="active">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="7" r="4"/>
-              <path d="M5.5 21a8.38 8.38 0 0 1 13 0"/>
-            </svg>
-            Kanban
-          </router-link>
-          <router-link to="/front/costs" class="nav-link" active-class="active" @click="onCostsNav">
+            Dashboard
+          </router-link> -->
+          <router-link to="/front/salaries" class="nav-link" active-class="active">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10"/>
               <path d="M12 6v6l4 2"/>
             </svg>
-            Couts
+            Mes Salaires
+          </router-link>
+          <router-link to="/front/employees" class="nav-link" active-class="active">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 6v6l4 2"/>
+            </svg>
+            Informations Employés
+          </router-link>
+          <router-link to="/front/salaries-list" class="nav-link" active-class="active">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            Liste salariés
+          </router-link>
+          <router-link to="/front/leaves" class="nav-link" active-class="active">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            Jours fériés
+          </router-link>
+          <router-link to="/front/salaries/bulk" class="nav-link" active-class="active">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+            Générer salaires
+          </router-link>
+          <router-link to="/front/salaries/create" class="nav-link" active-class="active">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+              <polyline points="10 9 9 9 8 9"/>
+            </svg>
+            Créer un salaire
           </router-link>
         </nav>
       </div>
@@ -57,7 +86,7 @@
           </svg>
           <input 
             type="search" 
-            placeholder="Rechercher un ticket, un élément..."
+            placeholder="Rechercher un employé..."
             v-model="searchQuery"
             @keyup.enter="handleSearch"
           />
@@ -71,8 +100,8 @@
 
         <!-- Menu utilisateur -->
         <div class="user-menu" @click="showUserMenu = !showUserMenu">
-          <div class="avatar">User</div>
-          <span class="user-name">User Front</span>
+          <div class="avatar">{{ userInitials }}</div>
+          <span class="user-name">{{ userName }}</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="6 9 12 15 18 9"/>
           </svg>
@@ -80,11 +109,28 @@
           <!-- Dropdown -->
           <div v-if="showUserMenu" class="user-dropdown">
             <router-link to="/dashboard" class="dropdown-item">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <rect x="3" y="3" width="7" height="7"/>
+                <rect x="14" y="3" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/>
+              </svg>
               Backoffice
             </router-link>
+            <router-link to="/front/dashboard" class="dropdown-item">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <line x1="3" y1="9" x2="21" y2="9"/>
+                <line x1="9" y1="21" x2="9" y2="9"/>
+              </svg>
+              Frontoffice
+            </router-link>
             <button class="dropdown-item" @click="logout">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
               Déconnexion
             </button>
           </div>
@@ -104,32 +150,38 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { killSession, clearSessionToken } from '@/services/api/glpiClient'
+import { dolibarrAuthService } from '@/services/dolibarrAuthService'
 
 const router = useRouter()
 const searchQuery = ref('')
 const apiOnline = ref(true)
 const showUserMenu = ref(false)
+const userName = ref('Utilisateur')
+const userInitials = ref('U')
+
+// Récupérer les infos utilisateur
+onMounted(() => {
+  const session = dolibarrAuthService.getSession()
+  if (session?.user) {
+    const user = session.user
+    userName.value = `${user.firstname || ''} ${user.name || ''}`.trim() || user.login || 'Utilisateur'
+    userInitials.value = (user.firstname?.[0] || user.login?.[0] || 'U').toUpperCase()
+  }
+})
 
 function handleSearch() {
   if (!searchQuery.value.trim()) return
   router.push(`/front/search?q=${encodeURIComponent(searchQuery.value)}`)
 }
 
-function onCostsNav() {
-  console.log('nav costs', '/front/costs')
-}
-
 async function logout() {
   try {
-    await killSession()
-  } catch (e) {
-    console.error(e)
-  } finally {
-    clearSessionToken()
+    dolibarrAuthService.logout()
     router.push('/login')
+  } catch (e) {
+    console.error('Erreur déconnexion:', e)
   }
 }
 
@@ -185,7 +237,7 @@ document.addEventListener('click', (e) => {
 .logo-icon {
   width: 32px;
   height: 32px;
-  background: #3b82f6;
+  background: #2563eb;
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -225,7 +277,7 @@ document.addEventListener('click', (e) => {
 
 .nav-link.active {
   background: #eff6ff;
-  color: #3b82f6;
+  color: #2563eb;
 }
 
 /* Header Right */
@@ -307,7 +359,7 @@ document.addEventListener('click', (e) => {
 .avatar {
   width: 28px;
   height: 28px;
-  background: #3b82f6;
+  background: #2563eb;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -399,15 +451,32 @@ document.addEventListener('click', (e) => {
   .header-left {
     width: 100%;
     justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  
+  .front-nav {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  
+  .nav-link {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8rem;
+  }
+  
+  .nav-link svg {
+    width: 14px;
+    height: 14px;
   }
   
   .header-right {
     width: 100%;
+    flex-wrap: wrap;
   }
   
   .search-bar {
     flex: 1;
-    min-width: auto;
+    min-width: 150px;
   }
   
   .front-content {
@@ -416,6 +485,20 @@ document.addEventListener('click', (e) => {
   
   .user-name {
     display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .logo-text {
+    font-size: 0.9rem;
+  }
+  
+  .nav-link span {
+    display: none;
+  }
+  
+  .nav-link {
+    padding: 0.4rem 0.6rem;
   }
 }
 </style>
