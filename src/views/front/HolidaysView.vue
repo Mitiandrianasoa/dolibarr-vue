@@ -76,6 +76,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { gestionSqliteService, type JourFerie } from '@/services/backoffice/gestionSqlite'
+import { DateUtils } from '@/utils/dateUtils'
 
 const loading = ref(true)
 const saving = ref(false)
@@ -144,7 +145,7 @@ const removeItem = async (id: number) => {
 
 const formatDate = (date: string) => {
   if (!date) return '-'
-  return new Date(date).toLocaleDateString('fr-FR')
+  return DateUtils.inputToDisplayFormat(date)
 }
 
 onMounted(loadData)

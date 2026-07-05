@@ -59,13 +59,14 @@ export class BulkService {
   ): Promise<BulkSalaryResult[]> {
     const results: BulkSalaryResult[] = []
     // payload.datesp est une chaîne 'YYYY-MM-DD' (input date), pas un timestamp Dolibarr :
-    // DateUtils.getYearMonth ferait un parseInt('2026-07-01') = 2026 et casserait le calcul.
-    const moisCourant = payload.datesp.slice(0, 7)
+    // DateUtils.getYearMonth ferait un parseInt('2026-07-01') = 2026 et casserait le calcul,
+    // il faut la variante "input" dédiée aux strings de formulaire.
+    const moisCourant = DateUtils.getYearMonthFromInput(payload.datesp)
 
     for (const employee of employees) {
       try {
       const employeeName = `${employee.prenom} ${employee.nom}`.trim()
-      const label = `Salaire ${new Date(payload.datesp).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`
+      const label = `Salaire ${DateUtils.parseLocalDate(payload.datesp).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`
 
       // Créer le salaire principal
       await salaireService.createSalary({
@@ -165,11 +166,11 @@ export class BulkService {
     for (const employee of employees) {
       try {
       const employeeName = `${employee.prenom} ${employee.nom}`.trim()
-      const label = `Salaire ${new Date(payload.datesp).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`
+      const label = `Salaire ${DateUtils.parseLocalDate(payload.datesp).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`
       const ferie = await gestionSqliteService.getJourFerieByDate(payload.datesp);
-      
+
       // Convertir les dates en objets Date pour pouvoir extraire l'année
-      const datespDate = new Date(payload.datesp);
+      const datespDate = DateUtils.parseLocalDate(payload.datesp);
       let shouldApplyFerie = false;
       let message = 'Salaire généré avec succès';
 
@@ -180,7 +181,7 @@ export class BulkService {
           message = 'Salaire généré avec succès + pourcentage du jour férié pour le mois suivant';
         } else if (ferie.fixe === 0) {
           // Férié non fixe : vérifier que l'année correspond
-          const ferieDate = new Date(ferie.dateFerie);
+          const ferieDate = DateUtils.parseLocalDate(ferie.dateFerie);
           if (datespDate.getFullYear() === ferieDate.getFullYear()) {
             shouldApplyFerie = true;
             message = 'Salaire généré avec succès + pourcentage du jour férié pour le mois suivant';

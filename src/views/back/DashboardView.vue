@@ -128,6 +128,7 @@
           <tr>
             <th>Mois</th>
             <th>Total salaire</th>
+            <th>Total payé</th>
             <th>Nb salaires</th>
             <th>Action</th>
           </tr>
@@ -136,6 +137,7 @@
           <tr v-for="item in statsByMois" :key="item.mois" style="cursor:pointer;">
             <td class="col-name">{{ item.mois_label }}</td>
             <td class="col-amount">{{ item.total_amount.toFixed(2) }} €</td>
+            <td class="col-amount">{{ item.total_paid.toFixed(2) }} €</td>
             <td>{{ item.count }}</td>
             <td>
               <button class="btn-outline-sm" @click="showMonthDetails(item.mois)">Voir détails</button>
@@ -146,6 +148,7 @@
           <tr class="total-row">
             <td><strong>Total</strong></td>
             <td><strong>{{ totalSalairesMois.toFixed(2) }} €</strong></td>
+            <td><strong>{{ totalPayeMois.toFixed(2) }} €</strong></td>
             <td><strong>{{ totalPaiementsMois }}</strong></td>
             <td></td>
           </tr>
@@ -208,9 +211,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { dashboardService } from '@/services/backoffice/dashboard'
+import { DateUtils } from '@/utils/dateUtils'
 
 interface StatsGenre { genre: string, total_salary: number, total_paid: number, count: number }
-interface StatsMois { mois: string, mois_label: string, total_amount: number, count: number }
+interface StatsMois { mois: string, mois_label: string, total_amount: number, total_paid: number, count: number }
 
 const loading = ref(false)
 const apiError = ref('')
@@ -226,6 +230,10 @@ const totalSalairesMois = computed(() => {
 
 const totalPaiementsMois = computed(() => {
   return statsByMois.value.reduce((sum, item) => sum + item.count, 0)
+})
+
+const totalPayeMois = computed(() => {
+  return statsByMois.value.reduce((sum, item) => sum + item.total_paid, 0)
 })
 
 // ─── COMPUTED GENRE ──────────────────────────────────────────────────────────
@@ -256,7 +264,7 @@ function getGenreCardColor(genre: string): string {
 
 function getMonthCardColor(mois: string): string {
   const colors = ['blue', 'green', 'purple', 'orange', 'cyan', 'pink']
-  const index = new Date(mois + '-01').getMonth()
+  const index = DateUtils.parseLocalDate(mois + '-01').getMonth()
   return colors[index % colors.length]
 }
 
@@ -275,8 +283,7 @@ const formatMonth = (mois: string) => {
 
 const formatDate = (date: string) => {
   if (!date) return 'Non définie'
-  const d = new Date(date)
-  return d.toLocaleDateString('fr-FR')
+  return DateUtils.inputToDisplayFormat(date)
 }
 
 // ─── MÉTHODES ────────────────────────────────────────────────────────────────

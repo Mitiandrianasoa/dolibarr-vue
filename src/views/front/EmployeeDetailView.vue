@@ -41,7 +41,7 @@
         <div v-if="salaries.length === 0" class="empty">Aucun salaire enregistré</div>
         <div v-else class="salary-list">
           <div v-for="salary in salaries" :key="salary.id" class="salary-block">
-            <div class="salary-header">
+            <div class="salary-header" @click="redirectToSalary(salary.id)">
               <div>
                 <strong>{{ salary.label }}</strong>
                 <div class="salary-period">
@@ -59,6 +59,7 @@
                   <th>Date paiement</th>
                   <th>Montant</th>
                   <th>Référence</th>
+                  <!-- <th>Action</th> -->
                 </tr>
               </thead>
               <tbody>
@@ -66,6 +67,9 @@
                   <td>{{ formatPaymentDate(payment.datep) }}</td>
                   <td>{{ payment.amount.toFixed(2) }} €</td>
                   <td>{{ payment.num_payment || '-' }}</td>
+                  <!-- <td>
+                    <router-link :to="`/front/salaries/${salary.id}`" class="btn-view">Voir</router-link>
+                  </td> -->
                 </tr>
               </tbody>
             </table>
@@ -81,11 +85,13 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { employeeService, type Employee } from '@/services/frontoffice/employee'
 import { salaireService, type Salary } from '@/services/frontoffice/salaire'
+import { DateUtils } from '@/utils/dateUtils'
 
 const route = useRoute()
+const router = useRouter() 
 const employeeId = parseInt(route.params.id as string)
 const loading = ref(true)
 const employee = ref<Employee | null>(null)
@@ -95,26 +101,17 @@ const totalResteAPayer = computed(() =>
   salaries.value.reduce((sum, salary) => sum + salary.reste_a_payer, 0)
 )
 
+const redirectToSalary = (salaryId: number) => {
+  router.push(`/front/salaries/${salaryId}`)
+}
+
 const totalSalaire = computed(() =>
   salaries.value.reduce((sum, salary) => sum + salary.amount, 0)
 )
 
-const formatTimestamp = (timestamp: number) => {
-  if (!timestamp) return '-'
-  return new Date(timestamp * 1000).toLocaleDateString('fr-FR')
-}
+const formatTimestamp = (timestamp: number) => DateUtils.toDisplayFormat(timestamp)
 
-const formatPaymentDate = (datep: string | number) => {
-  if (!datep) return '-'
-  if (typeof datep === 'number') {
-    return new Date(datep * 1000).toLocaleDateString('fr-FR')
-  }
-  const parsed = parseInt(datep)
-  if (!isNaN(parsed) && parsed > 1000000000) {
-    return new Date(parsed * 1000).toLocaleDateString('fr-FR')
-  }
-  return new Date(datep).toLocaleDateString('fr-FR')
-}
+const formatPaymentDate = (datep: string | number) => DateUtils.toDisplayFormat(datep)
 
 onMounted(async () => {
   loading.value = true

@@ -1,4 +1,5 @@
 import { httpClient } from '@/services/httpClient'
+import { DateUtils } from '@/utils/dateUtils'
 
 export interface Employee {
   id: number
@@ -33,7 +34,7 @@ export class EmployeeService {
           genre: this.normalizeGenre(u.gender),
           weeklyhours: u.weeklyhours ? parseFloat(u.weeklyhours) : null,
           employee: u.employee || null,
-          date_embauche: u.dateemployment ? new Date(u.dateemployment * 1000).toLocaleDateString('fr-FR') : null,
+          date_embauche: u.dateemployment ? DateUtils.toDisplayFormat(u.dateemployment) : null,
           photo: u.photo_vignette || u.photo || null,
           poste: u.job || u.poste || null,
           email: u.email || null,

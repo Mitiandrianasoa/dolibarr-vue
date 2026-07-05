@@ -129,6 +129,15 @@ export class DateUtils {
   }
 
   /**
+   * Date du jour → 'YYYY-MM-DD' en LOCAL.
+   * À utiliser à la place de `new Date().toISOString().split('T')[0]`, qui prend le jour
+   * en UTC et peut renvoyer la veille entre minuit et l'heure du décalage local (ex: 0h-3h à Madagascar).
+   */
+  static todayAsInput(): string {
+    return this._dateToYMD(new Date());
+  }
+
+  /**
    * Vérifie si un jour férié RÉCURRENT (fixe = 1 : même mois/jour chaque année)
    * tombe dans l'intervalle [datesp, dateep].
    * Teste chaque année couverte par la période (utile si la période chevauche deux années).

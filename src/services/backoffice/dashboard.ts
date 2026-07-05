@@ -1,6 +1,7 @@
 // src/services/backoffice/dashboard.ts
 import { httpClient } from '@/services/httpClient'
 import { dolibarrAuthService } from '@/services/dolibarrAuthService'
+import { DateUtils } from '@/utils/dateUtils'
 
 export class DashboardService {
   private async getUsers() {
@@ -92,27 +93,31 @@ export class DashboardService {
   }
 
   async GetSalaryPerMonth() {
-    const salaries = await this.getSalaries()
-    const moisMap: Record<string, { total_amount: number; count: number }> = {}
+    const [salaries, payments] = await Promise.all([
+      this.getSalaries(),
+      this.getPayments()
+    ])
 
+    const moisMap: Record<string, { total_amount: number; total_paid: number; count: number }> = {}
+
+    // Construit salary.id → mois et accumule les montants de salaire
+    const salaryMonthMap: Record<number, string> = {}
     salaries.forEach(s => {
-      if (!s.datesp) return
-      const ts = typeof s.datesp === 'number' ? s.datesp : parseInt(s.datesp)
-      if (isNaN(ts) || ts <= 0) return
-      
-      // Ajout de 12h (43200s) pour éviter les décalages de fuseau horaire
-      const d = new Date((ts + 43200) * 1000)
-      const year = d.getFullYear()
-      const month = String(d.getMonth() + 1).padStart(2, '0')
-      const mois = `${year}-${month}`
-      
-      const amount = parseFloat(s.amount) || 0
+      const mois = DateUtils.getYearMonth(s.datesp)
+      if (!mois) return
 
-      if (!moisMap[mois]) {
-        moisMap[mois] = { total_amount: 0, count: 0 }
-      }
-      moisMap[mois].total_amount += amount
+      salaryMonthMap[s.id] = mois
+
+      if (!moisMap[mois]) moisMap[mois] = { total_amount: 0, total_paid: 0, count: 0 }
+      moisMap[mois].total_amount += parseFloat(s.amount) || 0
       moisMap[mois].count++
+    })
+
+    // Rattache chaque paiement au mois de son salaire
+    payments.forEach(p => {
+      const mois = salaryMonthMap[p.fk_salary]
+      if (!mois || !moisMap[mois]) return
+      moisMap[mois].total_paid += parseFloat(p.amount) || 0
     })
 
     const formatMonthLabel = (mois: string) => {
@@ -126,6 +131,7 @@ export class DashboardService {
         mois,
         mois_label: formatMonthLabel(mois),
         total_amount: Math.round(data.total_amount * 100) / 100,
+        total_paid:   Math.round(data.total_paid   * 100) / 100,
         count: data.count
       }))
       .sort((a, b) => a.mois.localeCompare(b.mois))
@@ -142,26 +148,14 @@ export class DashboardService {
     })
 
     const results = salaries
-      .filter(s => {
-        const ts = typeof s.datesp === 'number' ? s.datesp : parseInt(s.datesp)
-        if (isNaN(ts) || ts <= 0) return false
-        
-        // Ajout de 12h (43200s)
-        const d = new Date((ts + 43200) * 1000)
-        const sMois = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-        return sMois === mois
-      })
+      .filter(s => DateUtils.getYearMonth(s.datesp) === mois)
       .map(s => {
         const user = userMap[s.fk_user] || null
-        
-        const ts = typeof s.datesp === 'number' ? s.datesp : parseInt(s.datesp)
-        const d = new Date((ts + 43200) * 1000)
-        const dateFormatted = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-        
+
         return {
           salary_id: s.id,
           montant: parseFloat(s.amount) || 0,
-          date_salaire: dateFormatted,
+          date_salaire: DateUtils.toInputFormat(s.datesp),
           label: s.label || '',
           est_paye: s.paye === '1' || s.paye === 1,
           employe_id: user?.id || null,
@@ -169,7 +163,7 @@ export class DashboardService {
           genre: user ? this.normalizeGenre(user.gender) : 'Non spécifié'
         }
       })
-      .sort((a, b) => new Date(b.date_salaire).getTime() - new Date(a.date_salaire).getTime())
+      .sort((a, b) => DateUtils.parseLocalDate(b.date_salaire).getTime() - DateUtils.parseLocalDate(a.date_salaire).getTime())
 
     return results
   }

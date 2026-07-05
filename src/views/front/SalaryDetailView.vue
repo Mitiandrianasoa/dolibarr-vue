@@ -50,7 +50,7 @@
         <button v-if="detail.reste_a_payer > 0" class="btn-pay-all" @click="payAll">
           Payer tout ({{ detail.reste_a_payer.toFixed(2) }} €)
         </button>
-
+        
         <!-- Liste des paiements -->
         <div v-if="detail.payments.length === 0" class="empty-payments">Aucun paiement</div>
 
@@ -174,7 +174,7 @@ const payAll = async () => {
   
   loading.value = true
   try {
-    await salaireService.payRest(id, new Date().toISOString().split('T')[0])
+    await salaireService.payRest(id, DateUtils.todayAsInput())
     await loadDetail()
   } catch (e: any) {
     alert('Erreur: ' + e.message)

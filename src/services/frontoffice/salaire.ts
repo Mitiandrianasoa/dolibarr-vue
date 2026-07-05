@@ -99,8 +99,8 @@ export class SalaireService {
    * Crée un nouveau salaire
    */
   async createSalary(data: { fk_user: number, label: string, amount: number, datesp: string, dateep: string }) {
-    const datesp = new Date(data.datesp).getTime() / 1000
-    const dateep = new Date(data.dateep).getTime() / 1000
+    const datesp = DateUtils.inputToTimestamp(data.datesp)
+    const dateep = DateUtils.inputToTimestamp(data.dateep)
     
     return await httpClient.post<any>('/salaries', {
       fk_user: data.fk_user,
@@ -117,8 +117,8 @@ export class SalaireService {
    */
   async updateSalary(id: number, data: { label?: string, amount?: number, datesp?: string, dateep?: string }) {
     const payload: any = { ...data }
-    if (data.datesp) payload.datesp = new Date(data.datesp).getTime() / 1000
-    if (data.dateep) payload.dateep = new Date(data.dateep).getTime() / 1000
+    if (data.datesp) payload.datesp = DateUtils.inputToTimestamp(data.datesp)
+    if (data.dateep) payload.dateep = DateUtils.inputToTimestamp(data.dateep)
     
     return await httpClient.put(`/salaries/${id}`, payload)
   }
@@ -158,7 +158,7 @@ export class SalaireService {
   async createPayment(salaryId: number, data: { datep: string, amount: number, note?: string }) {
     const payload = {
       paiementtype: 6,
-      datepaye: new Date(data.datep).getTime() / 1000,
+      datepaye: DateUtils.inputToTimestamp(data.datep),
       chid: `CHQ-${Date.now()}`,
       amounts: { [salaryId]: data.amount },
       note_public: data.note || ''
