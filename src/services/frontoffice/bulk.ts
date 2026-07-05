@@ -79,13 +79,15 @@ export class BulkService {
 
       // getJoursFeriesInRange renvoie un TABLEAU (il peut y avoir plusieurs fériés dans la période)
       const feriesDansLaPeriode = await gestionSqliteService.getJoursFeriesInRange(payload.datesp, payload.dateep);
-
+      console.log(`Fériés dans la période pour ${employeeName}:`, feriesDansLaPeriode);
       // Ne garder que les fériés compatibles avec le mode du lot généré
-      // mode 2 (jour et nuit) matche toujours, sinon il faut une correspondance exacte de mode
-      const feriesApplicables = feriesDansLaPeriode.filter(ferie =>
-        ferie.pourcentage > 0 && (ferie.mode === 2 || payload.mode === 2 || ferie.mode === payload.mode)
-      );
-
+      // mode 2 (jour et nuit) matche toujours, un mode non défini (ferié pas encore configuré) matche aussi,
+      // sinon il faut une correspondance exacte de mode
+      // const feriesApplicables = feriesDansLaPeriode.filter(ferie =>
+      //   ferie.pourcentage > 0 && (ferie.mode == null || ferie.mode === 2 || payload.mode === 2 || ferie.mode === payload.mode)
+      // );
+      
+      const feriesApplicables = feriesDansLaPeriode
       let message = 'Salaire généré avec succès';
 
       if (feriesApplicables.length > 0) {
@@ -131,7 +133,7 @@ export class BulkService {
           }
         }
 
-        message = `Salaire généré avec succès + ${feriesApplicables.length} prime(s) de jour férié pour le mois suivant`;
+        message = `Salaire généré avec succès + ${feriesApplicables.length} prime(s) de jour férié`;
       }
 
       results.push({

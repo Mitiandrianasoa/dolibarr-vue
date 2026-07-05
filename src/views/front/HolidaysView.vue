@@ -21,6 +21,7 @@
             <th>Libellé</th>
             <th>Pourcentage</th>
             <th>Fixe</th>
+            <!-- <th>Mode</th> -->
             <th>Actions</th>
           </tr>
         </thead>
@@ -30,6 +31,7 @@
             <td>{{ item.libelle }}</td>
             <td>{{ item.pourcentage }}%</td>
             <td>{{ item.fixe }}</td>
+            <td>{{ formatMode(item.mode) }}</td>
             <td class="actions">
               <button class="btn-sm" @click="openEdit(item)">Modifier</button>
               <button class="btn-sm btn-delete" @click="removeItem(item.id)">Supprimer</button>
@@ -61,6 +63,14 @@
             <label>Fixe *</label>
             <input type="number" v-model.number="form.fixe" required min="0" max="1" placeholder="Ex: 1" />
           </div>
+          <!-- <div class="form-group">
+            <label>Mode *</label>
+            <select v-model.number="form.mode" required>
+              <option :value="0">Jour</option>
+              <option :value="1">Nuit</option>
+              <option :value="2">Jour et nuit</option>
+            </select>
+          </div> -->
           <div class="form-actions">
             <button type="button" class="btn-cancel" @click="closeForm">Annuler</button>
             <button type="submit" class="btn-submit" :disabled="saving">
@@ -84,7 +94,7 @@ const error = ref('')
 const holidays = ref<JourFerie[]>([])
 const showForm = ref(false)
 const editingId = ref<number | null>(null)
-const form = ref({ libelle: '', dateFerie: '', pourcentage: 0, fixe: 0 })
+const form = ref({ libelle: '', dateFerie: '', pourcentage: 0, fixe: 0, mode: 2 })
 
 const loadData = async () => {
   loading.value = true
@@ -100,13 +110,13 @@ const loadData = async () => {
 
 const openCreate = () => {
   editingId.value = null
-  form.value = { libelle: '', dateFerie: '', pourcentage: 0, fixe: 0 }
+  form.value = { libelle: '', dateFerie: '', pourcentage: 0, fixe: 0, mode: 2 }
   showForm.value = true
 }
 
 const openEdit = (item: JourFerie) => {
   editingId.value = item.id
-  form.value = { libelle: item.libelle, dateFerie: item.dateFerie , pourcentage: item.pourcentage, fixe: item.fixe }
+  form.value = { libelle: item.libelle, dateFerie: item.dateFerie, pourcentage: item.pourcentage, fixe: item.fixe, mode: item.mode ?? 2 }
   showForm.value = true
 }
 
@@ -146,6 +156,13 @@ const removeItem = async (id: number) => {
 const formatDate = (date: string) => {
   if (!date) return '-'
   return DateUtils.inputToDisplayFormat(date)
+}
+
+const formatMode = (mode: number | null | undefined) => {
+  if (mode === 0) return 'Jour'
+  if (mode === 1) return 'Nuit'
+  if (mode === 2) return 'Jour et nuit'
+  return 'Non défini (= tous)'
 }
 
 onMounted(loadData)
