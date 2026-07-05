@@ -215,10 +215,132 @@ sous-conditions nommées avant de l'écrire d'un coup :
 4. `payload.mode === 2` → le lot généré couvre "tous les modes"
 5. `ferie.mode === payload.mode` → correspondance exacte
 
-## 10. Erreurs classiques à éviter
+## 10. Sélectionner par critère (le plus ancien, le plus grand, le plus petit)
+
+Souvent l'énoncé ne demande pas de tout trier, mais de **choisir un ou N éléments** selon un
+critère. Deux approches selon le besoin.
+
+### a) UN seul élément (le max / le min) → `.reduce()`
+
+```ts
+// Le salaire le PLUS ANCIEN (plus petit timestamp datesp)
+const plusAncien = salaries.reduce((min, s) =>
+  Number(s.datesp) < Number(min.datesp) ? s : min
+)
+
+// Le salaire le PLUS RÉCENT (plus grand timestamp datesp)
+const plusRecent = salaries.reduce((max, s) =>
+  Number(s.datesp) > Number(max.datesp) ? s : max
+)
+
+// Le salaire le PLUS GRAND (montant max)
+const plusGrand = salaries.reduce((max, s) => s.amount > max.amount ? s : max)
+
+// Le salaire le PLUS PETIT (montant min)
+const plusPetit = salaries.reduce((min, s) => s.amount < min.amount ? s : min)
+```
+⚠️ `.reduce()` sans valeur initiale **plante si le tableau est vide**. Sécuriser :
+```ts
+const plusGrand = salaries.length > 0
+  ? salaries.reduce((max, s) => s.amount > max.amount ? s : max)
+  : null
+```
+
+### b) TRIER toute la liste (puis éventuellement prendre les N premiers) → `.sort()`
+
+```ts
+// Du plus ancien au plus récent (date de début croissante)
+const parDateAsc = [...salaries].sort((a, b) => Number(a.datesp) - Number(b.datesp))
+
+// Du plus récent au plus ancien (date décroissante) → inverser le signe
+const parDateDesc = [...salaries].sort((a, b) => Number(b.datesp) - Number(a.datesp))
+
+// Du montant le plus grand au plus petit
+const parMontantDesc = [...salaries].sort((a, b) => b.amount - a.amount)
+
+// Du montant le plus petit au plus grand
+const parMontantAsc = [...salaries].sort((a, b) => a.amount - b.amount)
+
+// Les 3 plus gros salaires
+const top3 = [...salaries].sort((a, b) => b.amount - a.amount).slice(0, 3)
+```
+**Mémo du signe** (crucial, source d'erreur n°1 à l'examen) :
+- `a - b` → **croissant** (ASC) : petit → grand, ancien → récent
+- `b - a` → **décroissant** (DESC) : grand → petit, récent → ancien
+
+⚠️ **Toujours `[...salaries]`** (copie) avant `.sort()` : `.sort()` **modifie le tableau
+d'origine sur place**. Sans la copie, tu tries `allSalaries` lui-même et tu perds l'ordre initial.
+
+### c) Combiner filtre + tri + sélection (cas d'examen typique)
+
+> "Payer le salaire dû le plus ancien de l'employé"
+```ts
+const salaireAPayer = salaries
+  .filter(s => s.fk_user === employeeId)      // 1. cet employé
+  .filter(s => s.reste_a_payer > 0)           // 2. encore dû
+  .sort((a, b) => Number(a.datesp) - Number(b.datesp))[0]  // 3. le plus ancien
+// [0] = premier après tri ASC = le plus ancien ; undefined si aucun ne correspond
+```
+
+## 11. Répartition d'un montant en cascade (filtre + tri + distribution)
+
+Pattern de `BulkPayment` : répartir un montant sur plusieurs éléments, dans un ordre de priorité,
+jusqu'à épuisement. C'est le mariage de **filtrer** (garder ce qui reste à payer) + **trier**
+(ordre de priorité) + **boucler avec un solde décroissant**.
+
+```ts
+async repartirMontant(ids: number[], montant: number): Promise<Resultat[]> {
+  // 1. FILTRER : ne garder que les lignes qui ont encore un solde
+  const details = await Promise.all(ids.map(id => monService.getDetail(id)))
+  const valides = details.filter((d): d is Detail => d !== null && d.resteAPayer > 0)
+
+  // 2. TRIER : par priorité (groupe A avant groupe B), puis par un critère secondaire
+  const tries = [...valides].sort((a, b) => {
+    const prioriteA = estGroupeA(a) ? 0 : 1
+    const prioriteB = estGroupeA(b) ? 0 : 1
+    if (prioriteA !== prioriteB) return prioriteA - prioriteB  // niveau 1 : le groupe
+    return Number(a.date) - Number(b.date)                     // niveau 2 : le plus ancien d'abord
+    // variantes du niveau 2 selon la consigne :
+    //   return a.montant - b.montant   → le plus petit montant d'abord
+    //   return b.montant - a.montant   → le plus gros montant d'abord
+  })
+
+  // 3. DISTRIBUER en cascade : chaque ligne prend ce qu'elle peut, on décrémente le restant
+  let restant = montant
+  const resultats: Resultat[] = []
+  for (const item of tries) {
+    if (restant <= 0) break                        // plus rien à distribuer → on arrête
+    const aPayer = Math.min(restant, item.resteAPayer)  // ne jamais dépasser ni le restant ni le dû
+    if (aPayer <= 0) continue
+
+    await monService.payer(item.id, aPayer)
+    restant -= aPayer                              // on décrémente le solde disponible
+    resultats.push({ id: item.id, montantPaye: aPayer })
+  }
+
+  return resultats
+}
+```
+Les 3 pièces clés à retenir :
+- `Math.min(restant, item.resteAPayer)` → on paie le minimum entre "ce qu'il me reste à distribuer" et "ce que cette ligne doit encore" (ni trop, ni négatif)
+- `restant -= aPayer` → le solde disponible diminue à chaque itération
+- `if (restant <= 0) break` → dès que le montant est épuisé, on arrête (les lignes suivantes ne reçoivent rien)
+
+**Pour changer l'ordre de paiement**, tu ne touches QUE le `return` du niveau 2 du tri :
+| Consigne | Ligne à mettre |
+|---|---|
+| Le plus ancien payé en premier | `return Number(a.date) - Number(b.date)` |
+| Le plus récent payé en premier | `return Number(b.date) - Number(a.date)` |
+| Le plus petit montant d'abord | `return a.montant - b.montant` |
+| Le plus gros montant d'abord | `return b.montant - a.montant` |
+
+## 12. Erreurs classiques à éviter
 
 - `if (filters.value.min)` au lieu de `if (filters.value.min != null)` → `0` est falsy en JS, un filtre "minimum = 0" serait ignoré à tort
 - Muter directement `allItems.value` avec `.filter()` au lieu de réassigner `filteredItems.value` → perd la liste complète, plus moyen de "réinitialiser"
 - Oublier `.toLowerCase()` sur un seul des deux côtés de la comparaison texte
 - Comparer des dates `'YYYY-MM-DD'` avec `<`/`>` sans `DateUtils.parseLocalDate` → comparaison de strings, pas de dates (marche par coïncidence pour ce format précis, mais casse pour des comparaisons plus complexes comme les fériés récurrents)
 - Filtrer un champ qui peut être `null`/`undefined` sans vérifier avant (`item.poste.toLowerCase()` plante si `poste` est `null`)
+- `.sort()` sans copie `[...tableau]` → modifie le tableau d'origine sur place et casse l'ordre initial de `allItems`
+- Se tromper de signe dans `.sort()` → `a - b` = croissant (ASC), `b - a` = décroissant (DESC) ; l'inverser donne l'ordre opposé sans erreur visible
+- `.reduce()` sans valeur initiale sur un tableau potentiellement vide → plante (`Reduce of empty array with no initial value`)
