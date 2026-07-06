@@ -64,6 +64,12 @@
             </svg>
             Générer salaires
           </router-link>
+          <router-link to="/front/salaries/bulk-month" class="nav-link" active-class="active">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+            Salaires / mois
+          </router-link>
           <router-link to="/front/salaries/create" class="nav-link" active-class="active">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>

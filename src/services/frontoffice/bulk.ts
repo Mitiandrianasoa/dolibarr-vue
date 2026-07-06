@@ -163,6 +163,118 @@ export class BulkService {
 
 
   /**
+   * Retourne les intervalles de dates du mois qui NE SONT PAS déjà couverts
+   * par un salaire existant.
+   * @param salaires  salaires déjà présents pour le mois (datesp/dateep en timestamp Dolibarr)
+   * @param annee     année (ex: 2026)
+   * @param mois      mois 1-12 (ex: 7 pour juillet)
+   */
+  getIntervalleDate(
+    salaires: Salary[],
+    annee: number,
+    mois: number
+  ): { datesp: string, dateep: string, nbJours: number }[] {
+    const lastDay = new Date(annee, mois, 0).getDate() // dernier jour du mois
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const ymd = (day: number) => `${annee}-${pad(mois)}-${pad(day)}`
+
+    // Marquer les jours déjà couverts par un salaire existant
+    const occupe: boolean[] = new Array(lastDay + 1).fill(false)
+    for (const s of salaires) {
+      const debut = DateUtils.parseLocalDate(DateUtils.toInputFormat(s.datesp))
+      const fin   = DateUtils.parseLocalDate(DateUtils.toInputFormat(s.dateep))
+      for (let day = 1; day <= lastDay; day++) {
+        const courant = new Date(annee, mois - 1, day)
+        if (courant >= debut && courant <= fin) occupe[day] = true
+      }
+    }
+
+    // Construire les intervalles de jours consécutifs NON occupés
+    const intervalles: { datesp: string, dateep: string, nbJours: number }[] = []
+    let start: number | null = null
+    for (let day = 1; day <= lastDay; day++) {
+      if (!occupe[day]) {
+        if (start === null) start = day
+      } else if (start !== null) {
+        intervalles.push({ datesp: ymd(start), dateep: ymd(day - 1), nbJours: day - start })
+        start = null
+      }
+    }
+    if (start !== null) {
+      intervalles.push({ datesp: ymd(start), dateep: ymd(lastDay), nbJours: lastDay - start + 1 })
+    }
+    return intervalles
+  }
+
+  /**
+   * Génère les salaires du mois par intervalle de dates non encore couvert.
+   * - salaireParJour  : salaire pour une journée
+   * - pourcentageFerie: majoration (en %) appliquée par jour férié trouvé dans l'intervalle
+   * Salaire d'une ligne = nbJours * salaireParJour + (nbFeries * salaireParJour * pourcentageFerie/100)
+   */
+  async createBulkSalaryByMonth(
+    employees: Employee[],
+    payload: { annee: number, mois: number, salaireParJour: number, pourcentageFerie: number }
+  ): Promise<BulkSalaryResult[]> {
+    const results: BulkSalaryResult[] = []
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const moisStr = `${payload.annee}-${pad(payload.mois)}`
+    const moisLabel = DateUtils.parseLocalDate(`${moisStr}-01`)
+      .toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+
+    for (const employee of employees) {
+      try {
+        const employeeName = `${employee.prenom} ${employee.nom}`.trim()
+
+        // Salaires déjà présents qui touchent ce mois
+        const tousSalaires = await salaireService.getSalaryByEmployee(employee.id)
+        const salairesDuMois = tousSalaires.filter(s => {
+          const ymDebut = DateUtils.getYearMonth(s.datesp)
+          const ymFin   = DateUtils.getYearMonth(s.dateep)
+          return ymDebut !== null && ymFin !== null && ymDebut <= moisStr && moisStr <= ymFin
+        })
+
+        // Intervalles de dates NON couverts par un salaire existant
+        const intervalles = this.getIntervalleDate(salairesDuMois, payload.annee, payload.mois)
+        console.log(`Intervalles libres pour ${employeeName}:`, intervalles)
+
+        if (intervalles.length === 0) {
+          results.push({ employeeId: employee.id, employeeName, success: true, message: 'Aucun jour à générer (mois déjà couvert)' })
+          continue
+        }
+
+        let nbLignes = 0
+        for (const intervalle of intervalles) {
+          const feries = await gestionSqliteService.getJoursFeriesInRange(intervalle.datesp, intervalle.dateep)
+          const base = intervalle.nbJours * payload.salaireParJour
+          const majoration = feries.length * payload.salaireParJour * (payload.pourcentageFerie / 100)
+          const montant = base + majoration
+          console.log(`[${employeeName}] ${intervalle.datesp} -> ${intervalle.dateep} : ${intervalle.nbJours}j x ${payload.salaireParJour} = ${base} | ${feries.length} ferie(s) majoration ${payload.pourcentageFerie}% = ${majoration} | total = ${montant}`)
+
+          await salaireService.createSalary({
+            fk_user: employee.id,
+            label: `Salaire ${moisLabel} (${intervalle.datesp} au ${intervalle.dateep})`,
+            amount: montant,
+            datesp: intervalle.datesp,
+            dateep: intervalle.dateep
+          })
+          nbLignes++
+        }
+
+        results.push({ employeeId: employee.id, employeeName, success: true, message: `${nbLignes} salaire(s) généré(s)` })
+      } catch (error: any) {
+        results.push({
+          employeeId: employee.id,
+          employeeName: `${employee.prenom} ${employee.nom}`.trim(),
+          success: false,
+          message: error.message || 'Erreur lors de la création'
+        })
+      }
+    }
+    return results
+  }
+
+  /**
    * Génère les salaires en masse pour les employés sélectionnés
    */
   async createBulkSalaryWithNextMonthAugmentation(
@@ -237,6 +349,50 @@ export class BulkService {
     return results
   }
 
+  
+   /**
+   * Bulk Salaire Normal
+   */
+  async createBulkSalaryNormal(
+    employees: Employee[],
+    payload: { datesp: string, dateep: string, amount: number, mode: number}
+  ): Promise<BulkSalaryResult[]> {
+    const results: BulkSalaryResult[] = []
+
+    for (const employee of employees) {
+      try {
+      const employeeName = `${employee.prenom} ${employee.nom}`.trim()
+      const label = `Salaire ${DateUtils.parseLocalDate(payload.datesp).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`
+
+      // Créer le salaire principal
+      await salaireService.createSalary({
+        fk_user: employee.id,
+        label: label,
+        amount: payload.amount,
+        datesp: payload.datesp,
+        dateep: payload.dateep
+      });
+
+      let message = 'Salaire généré avec succès';
+      console.log(`Paiement pour ${employeeName}: montant à payer = ${payload.amount},`)
+      results.push({
+          employeeId: employee.id,
+          employeeName,
+          success: true,
+          message: message
+        });
+
+      } catch (error: any) {
+        results.push({
+          employeeId: employee.id,
+          employeeName: `${employee.prenom} ${employee.nom}`.trim(),
+          success: false,
+          message: error.message || 'Erreur lors de la création'
+        })
+      }
+    }
+    return results
+  }
   /**
    * Répartit un montant unique sur plusieurs salaires sélectionnés.
    * Priorité : salaires normaux (label "Salaire ...") d'abord, triés par date de début ASC (le plus ancien payé en premier),
@@ -286,6 +442,7 @@ export class BulkService {
 
     return results
   }
+
 
 
 }

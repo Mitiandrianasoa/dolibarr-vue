@@ -87,6 +87,12 @@ const router = createRouter({
           meta: { title: 'Génération salaires en masse' },
         },
         {
+          path: '/front/salaries/bulk-month',
+          name: 'front-salary-bulk-month',
+          component: () => import('@/views/front/BulkSalaryByMonthView.vue'),
+          meta: { title: 'Génération salaires par mois' },
+        },
+        {
           path: '/front/salaries',
           name: 'front-salaries',
           component: () => import('@/views/front/SalariesView.vue'),
