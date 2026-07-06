@@ -101,10 +101,14 @@ export class DateUtils {
 
   /**
    * 'YYYY-MM-DD' → timestamp en SECONDES pour l'API Dolibarr / backend Spring Boot.
-   * Ex: inputToTimestamp('2026-07-01') → 1751292000 (minuit local en secondes)
+   * On vise MIDI local (parseLocalDate = minuit, + SAFE_OFFSET = +12h) et PAS minuit :
+   * ainsi la troncature en type `date` côté Dolibarr ne peut plus basculer d'un jour
+   * selon le fuseau serveur (marge de ±12h). C'est le pendant du +12h appliqué en lecture
+   * (toDisplayFormat / toInputFormat / getYearMonth).
+   * Ex: inputToTimestamp('2026-07-01') → midi local du 01/07/2026 en secondes
    */
   static inputToTimestamp(dateStr: string): number {
-    return Math.floor(this.parseLocalDate(dateStr).getTime() / 1000);
+    return Math.floor(this.parseLocalDate(dateStr).getTime() / 1000) + this.SAFE_OFFSET;
   }
 
   /**

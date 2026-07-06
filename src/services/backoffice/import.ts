@@ -3,6 +3,7 @@ import JSZip from 'jszip'
 import { httpClient } from '@/services/httpClient'
 import { dolibarrAuthService } from '@/services/dolibarrAuthService'
 import { RefIdMapper } from './RefIdMapper'
+import { DateUtils } from '@/utils/dateUtils'
 
 export interface ImportResultItem {
   ref: string
@@ -55,14 +56,16 @@ export class ImportService {
     return photos
   }
 
-  /** Convertit une date française (JJ/MM/AA) en timestamp */
+  /** Convertit une date française (JJ/MM/AA) en timestamp (minuit LOCAL, comme le reste de l'app) */
   private parseDate(value: string): number | null {
     if (!value) return null
     const parts = value.trim().split('/')
     if (parts.length !== 3) return null
     let [d, m, y] = parts
     if (y.length === 2) y = '20' + y
-    return Math.floor(new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T00:00:00Z`).getTime() / 1000)
+    // Même convention que DateUtils.inputToTimestamp (minuit LOCAL) pour rester
+    // cohérent avec les salaires créés dans l'app et l'affichage du dashboard.
+    return DateUtils.inputToTimestamp(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`)
   }
 
   /** Convertit un montant texte en nombre (ex: "1 200,50" -> 1200.5) */
